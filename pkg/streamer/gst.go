@@ -1,0 +1,88 @@
+package streamer
+
+import (
+	"fmt"
+	"reflect"
+	"strings"
+	"time"
+
+	"github.com/tinyzimmer/go-gst/gst"
+	"github.com/tinyzimmer/go-gst/gst/app"
+	"go.uber.org/zap"
+)
+
+const capsTagName = "caps"
+
+func init() {
+	gst.Init(nil)
+}
+
+type StreamElementCaps struct {
+	Mime     string `caps:"mime"`
+	Height   uint   `caps:"height"`
+	Width    uint   `caps:"width"`
+	Format   string `caps:"format"`
+	Channels uint   `caps:"channels"`
+	Rate     uint   `caps:"rate"`
+}
+
+type StreamElement struct {
+	Kind       string
+	Properties map[string]interface{}
+	Caps       *StreamElementCaps
+}
+
+func (se StreamElement) ToGstCaps() *gst.Caps {
+	if se.Caps == nil {
+		return nil
+	}
+
+	t := reflect.ValueOf(*se.Caps)
+
+	var mime string
+	var caps []string
+	for i := 0; i < t.NumField(); i++ {
+		valueField := t.Field(i)
+		tagField := t.Type().Field(i).Tag.Get(capsTagName)
+
+		if tagField == "mime" {
+			mime = valueField.String()
+		} else {
+			if !valueField.IsZero() {
+				caps = append(caps, fmt.Sprintf("%s=%v", tagField, valueField.Interface()))
+			}
+		}
+	}
+
+	return gst.NewCapsFromString(strings.Join(append([]string{mime}, caps...), ","))
+}
+
+func handleMessage(msg *gst.Message) error {
+
+	switch msg.Type() {
+	case gst.MessageEOS:
+		return app.ErrEOS
+	case gst.MessageError:
+		return msg.ParseError()
+	}
+
+	return nil
+}
+
+func LoopBus(lg *zap.Logger, pipeline *gst.Pipeline) {
+	// Retrieve the bus from the pipeline
+	bus := pipeline.GetPipelineBus()
+
+	// Loop over messsages from the pipeline
+	go func() {
+		for {
+			msg := bus.TimedPop(time.Duration(-1))
+			if msg == nil {
+				return
+			}
+			if err := handleMessage(msg); err != nil {
+				lg.Error("failed to handle message", zap.Error(err))
+			}
+		}
+	}()
+}

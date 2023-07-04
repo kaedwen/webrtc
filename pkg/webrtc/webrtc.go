@@ -3,8 +3,12 @@ package webrtc
 import (
 	"context"
 	"sync"
+	"time"
 
-	"gitea.heinrich.blue/PHI/webrtc-gst/pkg/server"
+	"github.com/kaedwen/webrtc/pkg/common"
+	"github.com/kaedwen/webrtc/pkg/server"
+	"github.com/kaedwen/webrtc/pkg/streamer"
+	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/tinyzimmer/go-gst/gst"
@@ -26,19 +30,19 @@ type PeerHandle struct {
 	videoTrack *webrtc.TrackLocalStaticSample
 }
 
-func NewWebrtcHandler(ctx context.Context, lg *zap.Logger, ch <-chan *server.SignalingHandle) error {
+func NewWebrtcHandler(ctx context.Context, lg *zap.Logger, cfg *common.ConfigStream, ch <-chan *server.SignalingHandle) error {
 	wh := WebrtcHandler{
 		lg:          lg,
 		mu:          &sync.Mutex{},
 		peerHandles: make(map[string]*PeerHandle, 0),
 	}
 
-	err := wh.handleAudioSamples(ctx, "audiotestsrc")
+	err := wh.handleAudioSamples(ctx, &cfg.AudioOut)
 	if err != nil {
 		return err
 	}
 
-	err = wh.handleVideoSamples(ctx, "videotestsrc")
+	err = wh.handleVideoSamples(ctx, &cfg.VideoOut)
 	if err != nil {
 		return err
 	}
@@ -99,13 +103,34 @@ func (wh *WebrtcHandler) stopPipelines() {
 
 }
 
-func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, src string) error {
+func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.ConfigAudioOutputStream) error {
+	properties := map[string]interface{}{}
+	if cfg.Source == "alsasrc" {
+		if cfg.Device != nil {
+			properties["device"] = *cfg.Device
+		} else {
+			properties["device-name"] = cfg.DeviceName
+		}
+	}
+
+	src := streamer.StreamElement{
+		Kind:       cfg.Source,
+		Properties: properties,
+		Caps: &streamer.StreamElementCaps{
+			Mime:     "audio/x-raw",
+			Channels: cfg.Channels,
+			Rate:     48000,
+		},
+	}
+
 	var err error
 	var audioCh <-chan media.Sample
-	wh.audioPipeline, audioCh, err = CreateAudioPipeline(src)
+	wh.audioPipeline, audioCh, err = streamer.CreateAudioPipelineSink(src)
 	if err != nil {
 		return err
 	}
+
+	streamer.LoopBus(wh.lg.With(zap.String("sub-context", "audio")), wh.audioPipeline)
 
 	go func() {
 		wh.lg.Info("wait for audio sample")
@@ -127,13 +152,28 @@ func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, src string) err
 	return nil
 }
 
-func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, src string) error {
+func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.ConfigVideoOutputStream) error {
+	src := streamer.StreamElement{
+		Kind: cfg.Source,
+		Properties: map[string]interface{}{
+			"device": cfg.Device,
+		},
+		Caps: &streamer.StreamElementCaps{
+			Mime:   "video/x-raw",
+			Format: "YUY2",
+			Width:  cfg.Width,
+			Height: cfg.Height,
+		},
+	}
+
 	var err error
 	var videoCh <-chan media.Sample
-	wh.videoPipeline, videoCh, err = CreateVideoPipeline(src)
+	wh.videoPipeline, videoCh, err = streamer.CreateVideoPipelineSink(src)
 	if err != nil {
 		return err
 	}
+
+	streamer.LoopBus(wh.lg.With(zap.String("sub-context", "video")), wh.videoPipeline)
 
 	go func() {
 		wh.lg.Info("wait for video sample")
@@ -169,6 +209,55 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 	if err != nil {
 		return err
 	}
+
+	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
+	// for the given codec
+	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+		wh.lg.Info("received track", zap.String("kind", track.Kind().String()), zap.String("codec", track.Codec().MimeType))
+
+		if track.Codec().MimeType != "audio/opus" {
+			wh.lg.Error("mimetype not supported", zap.String("mime", track.Codec().MimeType))
+			return
+		}
+
+		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
+		go func() {
+			ticker := time.NewTicker(time.Second * 3)
+			for {
+				select {
+				case <-ticker.C:
+					if err := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); err != nil {
+						wh.lg.Error("failed to send PLI", zap.Error(err))
+					}
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
+		pipeline, err := streamer.CreateAudioPipelineSrc(streamer.StreamElement{
+			Kind: "autoaudiosink",
+		})
+		if err != nil {
+			wh.lg.Error("failed to create src pipeline", zap.Error(err))
+		}
+
+		pipeline.Start()
+		buf := make([]byte, 1400)
+		for {
+			i, _, readErr := track.Read(buf)
+			if readErr != nil {
+				wh.lg.Error("read failed", zap.Error(err))
+			}
+
+			if i > 0 {
+				pipeline.Push(buf[:i])
+				if err != nil {
+					wh.lg.Error("push failed", zap.Error(err))
+				}
+			}
+		}
+	})
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected

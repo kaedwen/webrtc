@@ -5,9 +5,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"gitea.heinrich.blue/PHI/webrtc-gst/pkg/common"
-	"gitea.heinrich.blue/PHI/webrtc-gst/pkg/server"
-	"gitea.heinrich.blue/PHI/webrtc-gst/pkg/webrtc"
+	"github.com/kaedwen/webrtc/pkg/common"
+	"github.com/kaedwen/webrtc/pkg/server"
+	"github.com/kaedwen/webrtc/pkg/webrtc"
 	"github.com/tinyzimmer/go-glib/glib"
 	"go.uber.org/zap"
 )
@@ -28,7 +28,7 @@ func main() {
 
 	http := server.NewHttpServer(lg.With(zap.String("context", "server")), &cfg)
 
-	webrtc.NewWebrtcHandler(ctx, lg.With(zap.String("context", "webrtc")), http.Hndl)
+	webrtc.NewWebrtcHandler(ctx, lg.With(zap.String("context", "webrtc")), &cfg.Stream, http.Hndl)
 
 	http.ListenAndServe(ctx, cfg.Http.Address())
 

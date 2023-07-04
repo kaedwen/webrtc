@@ -1,4 +1,6 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { Component, ComponentRef, HostListener, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
+import { VideoComponent } from './components/video/video.component';
+import { AudioComponent } from './components/audio/audio.component';
 import { SignalingService } from './services/signaling.service';
 
 @Component({
@@ -7,17 +9,35 @@ import { SignalingService } from './services/signaling.service';
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent implements OnInit {
+  @ViewChild("vc", {static: true, read: ViewContainerRef }) 
+  public vcr!: ViewContainerRef;
 
-  @ViewChild('video', { static: true, read: ElementRef })
-  public videoElem!: ElementRef<HTMLVideoElement>;
-
-  @ViewChild('audio', { static: true, read: ElementRef })
-  public audioElem!: ElementRef<HTMLAudioElement>;
-
-  @ViewChild('start', { static: true, read: ElementRef })
-  public startElem!: ElementRef<HTMLButtonElement>;
+  private audioList: ComponentRef<AudioComponent>[] = [];
+  private selfAudioRunning = false;
 
   private readonly pc: RTCPeerConnection;
+
+  @HostListener('document:click', ['$event.target'])
+  async onClick(_: KeyboardEvent) {
+    if (!this.selfAudioRunning) {
+      await this.startAudio()
+    }
+  
+    for (const el of this.audioList) {
+      el.instance.toggleMute();
+    }
+  }
+
+  private async startAudio() {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: false
+    });
+
+    this.pc.addTrack(stream.getAudioTracks()[0])
+
+    this.selfAudioRunning = true;
+  }
 
   constructor(private signaling: SignalingService) {
     //this.pc = new RTCPeerConnection({iceServers: [{urls: 'stun:stun.l.google.com:19302'}]});
@@ -27,11 +47,16 @@ export class AppComponent implements OnInit {
     this.pc.ontrack = (event) => {
       const [remoteStream] = event.streams;
       if (event.track.kind === 'video') {
-        this.videoElem.nativeElement.srcObject = remoteStream;
-        this.videoElem.nativeElement.muted = true;
-        this.videoElem.nativeElement.play();
+        const video = this.vcr.createComponent(VideoComponent, {});
+        video.instance.setStream(remoteStream);
+        video.instance.play();
+        console.log(video);
       } else if (event.track.kind === 'audio') {
-        this.audioElem.nativeElement.srcObject = remoteStream;
+        const audio = this.vcr.createComponent(AudioComponent, {});
+        audio.instance.setStream(remoteStream);
+        console.log(audio);
+
+        this.audioList.push(audio)
       }
     }
 
@@ -48,7 +73,7 @@ export class AppComponent implements OnInit {
     };
 
     // Offer to receive 1 audio, and 1 video track
-    this.pc.addTransceiver('audio', {direction: 'recvonly'})
+    this.pc.addTransceiver('audio', {direction: 'sendrecv'})
     this.pc.addTransceiver('video', {direction: 'recvonly'})
     this.pc.createOffer().then(d => this.pc.setLocalDescription(d)).catch((e) => {
       console.error(e);
@@ -56,14 +81,12 @@ export class AppComponent implements OnInit {
     
     // Let the "negotiationneeded" event trigger offer generation.
     this.pc.onnegotiationneeded = async (e) => {
-      console.log(e);
-      // try {
-      //   await this.pc.setLocalDescription();
-      //   // Send the offer to the other peer.
-      //   this.api.send({desc: this.pc.localDescription});
-      // } catch (err) {
-      //   console.error(err);
-      // }
+      try {
+        await this.pc.setLocalDescription();
+        signaling.next(this.pc.localDescription);
+      } catch (err) {
+        console.error(err);
+      }
     };
 
     this.signaling.subscribe(async (x) => {
@@ -84,10 +107,6 @@ export class AppComponent implements OnInit {
 
   public async ngOnInit(): Promise<void> {
     
-  }
-
-  public run(e: MouseEvent): void {
-    this.videoElem.nativeElement.play();
   }
 
 }

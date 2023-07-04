@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"gitea.heinrich.blue/PHI/webrtc-gst/pkg/common"
 	"github.com/gin-gonic/gin"
+	"github.com/kaedwen/webrtc/pkg/common"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 	"nhooyr.io/websocket"
