@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version: 'stable'
-
-      # Runs a single command using the runners shell
+      - name: Prepare
+        run: apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
       - name: Build
         run: make build
