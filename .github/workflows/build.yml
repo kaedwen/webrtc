@@ -28,6 +28,6 @@ jobs:
         with:
           go-version: 'stable'
       - name: Prepare
-        run: apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+        run: sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
       - name: Build
         run: make build
