@@ -18,7 +18,8 @@ jobs:
   # This workflow contains a single job called "build"
   build:
     runs-on: ubuntu-22.04
-
+    container: "debian:stable-slim"
+  
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
@@ -26,7 +27,7 @@ jobs:
           go-version: 'stable'
       - name: Prepare
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes make gcc libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+          apt-get update
+          apt-get install --yes --no-install-recommends make gcc libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
       - name: Build
         run: make build
