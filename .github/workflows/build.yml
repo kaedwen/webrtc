@@ -26,8 +26,7 @@ jobs:
           go-version: 'stable'
       - name: Prepare
         run: |
-          sudo rm -rf /etc/apt/sources.list.d/*
-          sudo cat sources.list > /etc/apt/sources.list
+          sudo mv sources.list > /etc/apt/sources.list.d/my.list
           sudo apt-get update
           sudo apt-get install --yes make gcc libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
       - name: Build
