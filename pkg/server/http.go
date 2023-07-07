@@ -3,16 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
-	"mime"
 	"net/http"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kaedwen/webrtc/pkg/common"
+	"github.com/kaedwen/webrtc/static"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 	"nhooyr.io/websocket"
@@ -48,52 +44,13 @@ func NewHttpServer(lg *zap.Logger, cfg *common.Config) *HttpServer {
 	engine := gin.Default()
 	engine.GET("/signaling/:id", h.signalingHandler)
 
-	if cfg.Http.StaticPath != nil {
-		engine.NoRoute(func(c *gin.Context) {
-			t := path.Join(*cfg.Http.StaticPath, c.Request.URL.Path)
-
-			if i, err := os.Stat(t); err == nil && !i.IsDir() {
-				h.compress(c, t)
-				return
-			}
-
-			h.compress(c, path.Join(*cfg.Http.StaticPath, "index.html"))
-		})
-	}
+	// static handler
+	static.SetupHandler(engine, cfg.Http)
 
 	// set out handler
 	h.Handler = engine
 
 	return &h
-}
-
-func (h *HttpServer) compress(c *gin.Context, t string) {
-	encoding := c.Request.Header.Get("Accept-Encoding")
-
-	switch true {
-	case strings.Contains(encoding, "br"):
-		lt := t + ".br"
-		if i, err := os.Stat(lt); err == nil {
-			fmt.Println(i.Name())
-			c.Header("Content-Type", mime.TypeByExtension(filepath.Ext(t)))
-			c.Header("Content-Encoding", "br")
-			c.Header("Vary", "Accept-Encoding")
-			c.File(lt)
-			return
-		}
-	case strings.Contains(encoding, "gzip"):
-		lt := t + ".br"
-		if i, err := os.Stat(lt); err == nil {
-			fmt.Println(i.Name())
-			c.Header("Content-Type", mime.TypeByExtension(filepath.Ext(t)))
-			c.Header("Content-Encoding", "gzip")
-			c.File(lt)
-			return
-		}
-	}
-
-	fmt.Println(t)
-	c.File(t)
 }
 
 func (h *HttpServer) ListenAndServe(ctx context.Context, addr string) {
