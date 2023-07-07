@@ -18,7 +18,8 @@ jobs:
   # This workflow contains a single job called "build"
   build:
     runs-on: ubuntu-22.04
-
+    container: "debian:stable-slim"
+  
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
