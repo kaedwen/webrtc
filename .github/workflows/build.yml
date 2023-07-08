@@ -40,11 +40,8 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: 'yarn'
+          cache: 'npm'
       - name: Prepare
-        run: yarn --cwd static
+        run: npm --prefix static ci
       - name: Build
-        run: yarn --cwd static build
+        run: npm --prefix static run build
