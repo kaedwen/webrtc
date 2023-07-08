@@ -20,28 +20,24 @@ jobs:
     container: "debian:stable-slim"
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version: 'stable'
-      - name: Prepare
-        run: |
-          apt-get update
-          apt-get install --yes --no-install-recommends make gcc libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
-      - name: Build
-        run: make build
-      - uses: ncipollo/release-action@v1
-        with:
-          artifacts: "release.tar.gz,foo/*.txt"
-  build-frontend:
-    runs-on: ubuntu-latest
-    container: "debian:stable-slim"
-    steps:
-      - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
           node-version: 18
           cache: 'npm'
-      - name: Prepare
-        run: npm --prefix static ci
-      - name: Build
-        run: npm --prefix static run build
+      - name: Build Frontend
+        run: npm --prefix static ci && npm --prefix static run build
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 'stable'
+      - name: Prepare Backend
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends make gcc libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+      - name: Build Backend
+        run: make build-static
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: binary
+          path: service
+          retention-days: 5
