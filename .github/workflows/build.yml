@@ -16,7 +16,7 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build-backend:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     container: "debian:stable-slim"
     steps:
       - uses: actions/checkout@v3
@@ -33,7 +33,7 @@ jobs:
         with:
           artifacts: "release.tar.gz,foo/*.txt"
   build-frontend:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     container: "debian:stable-slim"
     steps:
       - uses: actions/checkout@v3
