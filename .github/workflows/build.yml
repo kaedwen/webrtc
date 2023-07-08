@@ -15,11 +15,9 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
+  build-backend:
     runs-on: ubuntu-22.04
     container: "debian:stable-slim"
-  
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
@@ -31,3 +29,19 @@ jobs:
           apt-get install --yes --no-install-recommends make gcc libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
       - name: Build
         run: make build
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "release.tar.gz,foo/*.txt"
+  build-frontend:
+    runs-on: ubuntu-22.04
+    container: "debian:stable-slim"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'yarn'
+      - name: Prepare
+        run: yarn --cwd static
+      - name: Build
+        run: yarn --cwd static build
