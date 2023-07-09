@@ -25,6 +25,9 @@ jobs:
           node-version: 18
           cache-dependency-path: static
           cache: npm
+      - run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends make
       - run: make build-static
       - uses: actions/upload-artifact@v3
         with:

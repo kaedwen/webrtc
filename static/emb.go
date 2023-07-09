@@ -41,7 +41,7 @@ func (s staticSource) Open(p string) (common.StaticSourceFile, error) {
 	return &staticSourceFile{t}, nil
 }
 
-func SetupHandler(e *gin.Engine, _ common.ConfigHTTP) {
+func SetupHandler(e *gin.Engine, _ *common.ConfigHTTP) {
 	handler := common.NewStaticHandler(staticSource{"dist"}, "index.html")
 	e.NoRoute(func(c *gin.Context) {
 		encoding := c.Request.Header.Get("Accept-Encoding")

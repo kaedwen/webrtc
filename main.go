@@ -26,14 +26,17 @@ func main() {
 		panic(err)
 	}
 
-	http := server.NewHttpServer(lg.With(zap.String("context", "server")), &cfg)
+	http := server.NewHttpServer(lg.With(zap.String("context", "server")), &cfg.Http)
 
 	err = webrtc.NewWebrtcHandler(ctx, lg.With(zap.String("context", "webrtc")), cfg.Stream(), http.Hndl)
 	if err != nil {
 		panic(err)
 	}
 
-	http.ListenAndServe(ctx, cfg.Http.Address())
+	err = http.ListenAndServe(ctx)
+	if err != nil {
+		panic(err)
+	}
 
 	// Listen for the interrupt signal.
 	<-ctx.Done()
