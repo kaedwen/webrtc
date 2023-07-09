@@ -40,13 +40,13 @@ jobs:
           - os: linux
             arch: amd64
             goarch: amd64
-            deps: ''
+            deps: gcc
             prefix: ''
           - os: linux
             arch: armhf
             goarch: arm
             deps: gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
-            prefix: arm-linux-gnueabihf-
+            prefix: arm-linux-gnueabihf
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
@@ -55,17 +55,18 @@ jobs:
       - run: |
           dpkg --add-architecture ${{ matrix.target.arch }}
           apt-get update
-          apt-get install --yes --no-install-recommends make gcc libglib2.0-dev:${{ matrix.target.arch }} libgstreamer1.0-dev:${{ matrix.target.arch }} libgstreamer-plugins-base1.0-dev:${{ matrix.target.arch }} ${{ matrix.target.deps }}
+          apt-get install --yes --no-install-recommends make libgstreamer1.0-dev:${{ matrix.target.arch }} libgstreamer-plugins-base1.0-dev:${{ matrix.target.arch }} ${{ matrix.target.deps }}
       - uses: actions/download-artifact@master
         with:
           name: static
           path: static/dist
+      - run: |
+          PREFIX="${{ matrix.target.prefix }}"
+          echo "${{ matrix.target.os }}" >> $GOOS
+          echo "${{ matrix.target.goarch }}" >> $GOARCH
+          echo "${PREFIX:+$PREFIX-}gcc" >> $CC
+          echo "/usr/lib/${{ matrix.target.prefix }}/pkgconfig" >> $PKG_CONFIG_PATH
       - run: make build-static
-        env:
-          GOOS: ${{ matrix.target.os }}
-          GOARCH: ${{ matrix.target.goarch }}
-          CC: ${{ matrix.target.prefix }}gcc
-          PKG_CONFIG_PATH: /usr/lib/${{ matrix.target.prefix }}/pkgconfig
       - uses: actions/upload-artifact@v3
         with:
           name: service-${{ matrix.target.os }}-${{ matrix.target.goarch }}
