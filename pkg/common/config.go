@@ -8,9 +8,17 @@ import (
 )
 
 type Config struct {
-	Logging ConfigLogging `arg:"-"`
-	Stream  ConfigStream  `arg:"-"`
-	Http    ConfigHTTP    `arg:"-"`
+	VideoOut ConfigVideoOutputStream `arg:"group:VideoOut"`
+	AudioOut ConfigAudioOutputStream `arg:"group:AudioOut"`
+	AudioIn  ConfigAudioInputStream  `arg:"group:AudioIn"`
+	Logging  ConfigLogging           `arg:"group:Logging"`
+	Http     ConfigHTTP              `arg:"group:Http"`
+}
+
+type ConfigStream struct {
+	VideoOut ConfigVideoOutputStream
+	AudioOut ConfigAudioOutputStream
+	AudioIn  ConfigAudioInputStream
 }
 
 type ConfigLogging struct {
@@ -23,12 +31,6 @@ type ConfigHTTP struct {
 	PathGetLiveness  string  `arg:"env:HTTP_PATH_LIVENESS" default:"/healthz"`
 	PathGetReadiness string  `arg:"env:HTTP_PATH_READINESS" default:"/readyz"`
 	StaticPath       *string `arg:"--http-static,env:HTTP_STATIC"`
-}
-
-type ConfigStream struct {
-	VideoOut ConfigVideoOutputStream `arg:"-"`
-	AudioOut ConfigAudioOutputStream `arg:"-"`
-	AudioIn  ConfigAudioInputStream  `arg:"-"`
 }
 
 type ConfigVideoOutputStream struct {
@@ -55,15 +57,18 @@ type ConfigAudioInputStream struct {
 	Channels   uint    `arg:"--audio-channels,env:AUDIO_CHANNELS" default:"1"`
 }
 
+func (c *Config) Stream() *ConfigStream {
+	return &ConfigStream{
+		VideoOut: c.VideoOut,
+		AudioOut: c.AudioOut,
+		AudioIn:  c.AudioIn,
+	}
+}
+
 func (c *ConfigHTTP) Address() string {
 	return net.JoinHostPort(c.Host, fmt.Sprint(c.Port))
 }
 
 func (c *Config) MustParse() {
-	arg.MustParse(&c.Logging)
-	arg.MustParse(&c.Stream.VideoOut)
-	arg.MustParse(&c.Stream.AudioOut)
-	arg.MustParse(&c.Stream.AudioIn)
-	arg.MustParse(&c.Http)
 	arg.MustParse(c)
 }

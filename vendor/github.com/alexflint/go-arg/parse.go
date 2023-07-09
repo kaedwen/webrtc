@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -43,18 +44,19 @@ func (p path) Child(f reflect.StructField) path {
 
 // spec represents a command line option
 type spec struct {
-	dest        path
-	field       reflect.StructField // the struct field from which this option was created
-	long        string              // the --long form for this option, or empty if none
-	short       string              // the -s short form for this option, or empty if none
-	cardinality cardinality         // determines how many tokens will be present (possible values: zero, one, multiple)
-	required    bool                // if true, this option must be present on the command line
-	positional  bool                // if true, this option will be looked for in the positional flags
-	separate    bool                // if true, each slice and map entry will have its own --flag
-	help        string              // the help text for this option
-	env         string              // the name of the environment variable for this option, or empty for none
-	defaultVal  string              // default value for this option
-	placeholder string              // name of the data in help
+	dest          path
+	field         reflect.StructField // the struct field from which this option was created
+	long          string              // the --long form for this option, or empty if none
+	short         string              // the -s short form for this option, or empty if none
+	cardinality   cardinality         // determines how many tokens will be present (possible values: zero, one, multiple)
+	required      bool                // if true, this option must be present on the command line
+	positional    bool                // if true, this option will be looked for in the positional flags
+	separate      bool                // if true, each slice and map entry will have its own --flag
+	help          string              // the help text for this option
+	env           string              // the name of the environment variable for this option, or empty for none
+	defaultValue  reflect.Value       // default value for this option
+	defaultString string              // default value for this option, in string form to be displayed in help text
+	placeholder   string              // name of the data in help
 }
 
 // command represents a named subcommand, or the top-level command
@@ -62,9 +64,21 @@ type command struct {
 	name        string
 	help        string
 	dest        path
-	specs       []*spec
+	options     []*spec
 	subcommands []*command
+	groups      []*command
 	parent      *command
+}
+
+// specs gets all the specs from this command plus all nested option groups,
+// recursively through descendants
+func (cmd command) specs() []*spec {
+	var specs []*spec
+	specs = append(specs, cmd.options...)
+	for _, grpcmd := range cmd.groups {
+		specs = append(specs, grpcmd.specs()...)
+	}
+	return specs
 }
 
 // ErrHelp indicates that -h or --help were provided
@@ -73,27 +87,31 @@ var ErrHelp = errors.New("help requested by user")
 // ErrVersion indicates that --version was provided
 var ErrVersion = errors.New("version requested by user")
 
+// for monkey patching in example code
+var mustParseExit = os.Exit
+
 // MustParse processes command line arguments and exits upon failure
 func MustParse(dest ...interface{}) *Parser {
-	p, err := NewParser(Config{}, dest...)
+	return mustParse(Config{Exit: mustParseExit}, dest...)
+}
+
+// mustParse is a helper that facilitates testing
+func mustParse(config Config, dest ...interface{}) *Parser {
+	if config.Exit == nil {
+		config.Exit = os.Exit
+	}
+	if config.Out == nil {
+		config.Out = os.Stdout
+	}
+
+	p, err := NewParser(config, dest...)
 	if err != nil {
-		fmt.Fprintln(stdout, err)
-		osExit(-1)
-		return nil // just in case osExit was monkey-patched
+		fmt.Fprintln(config.Out, err)
+		config.Exit(-1)
+		return nil
 	}
 
-	err = p.Parse(flags())
-	switch {
-	case err == ErrHelp:
-		p.writeHelpForSubcommand(stdout, p.lastCmd)
-		osExit(0)
-	case err == ErrVersion:
-		fmt.Fprintln(stdout, p.version)
-		osExit(0)
-	case err != nil:
-		p.failWithSubcommand(err.Error(), p.lastCmd)
-	}
-
+	p.MustParse(flags())
 	return p
 }
 
@@ -121,6 +139,20 @@ type Config struct {
 
 	// IgnoreEnv instructs the library not to read environment variables
 	IgnoreEnv bool
+
+	// IgnoreDefault instructs the library not to reset the variables to the
+	// default values, including pointers to sub commands
+	IgnoreDefault bool
+
+	// StrictSubcommands intructs the library not to allow global commands after
+	// subcommand
+	StrictSubcommands bool
+
+	// Exit is called to terminate the process with an error code (defaults to os.Exit)
+	Exit func(int)
+
+	// Out is where help text, usage text, and failure messages are printed (defaults to os.Stdout)
+	Out io.Writer
 }
 
 // Parser represents a set of command line options with destination values
@@ -130,6 +162,7 @@ type Parser struct {
 	config      Config
 	version     string
 	description string
+	epilogue    string
 
 	// the following field changes during processing of command line arguments
 	lastCmd *command
@@ -149,6 +182,14 @@ type Described interface {
 	// Description returns the string that will be printed on a line by itself
 	// at the top of the help message.
 	Description() string
+}
+
+// Epilogued is the interface that the destination struct should implement to
+// add an epilogue string at the bottom of the help message.
+type Epilogued interface {
+	// Epilogue returns the string that will be printed on a line by itself
+	// at the end of the help message.
+	Epilogue() string
 }
 
 // walkFields calls a function for each field of a struct, recursively expanding struct fields.
@@ -174,6 +215,14 @@ func walkFieldsImpl(t reflect.Type, visit func(field reflect.StructField, owner 
 
 // NewParser constructs a parser from a list of destination structs
 func NewParser(config Config, dests ...interface{}) (*Parser, error) {
+	// fill in defaults
+	if config.Exit == nil {
+		config.Exit = os.Exit
+	}
+	if config.Out == nil {
+		config.Out = os.Stdout
+	}
+
 	// first pick a name for the command for use in the usage text
 	var name string
 	switch {
@@ -197,34 +246,36 @@ func NewParser(config Config, dests ...interface{}) (*Parser, error) {
 	}
 
 	// process each of the destination values
-	for i, dest := range dests {
+	for _, dest := range dests {
 		t := reflect.TypeOf(dest)
 		if t.Kind() != reflect.Ptr {
 			panic(fmt.Sprintf("%s is not a pointer (did you forget an ampersand?)", t))
 		}
 
-		cmd, err := cmdFromStruct(name, path{root: i}, t)
+		err := p.cmd.parseFieldsFromStructPointer(t, false)
 		if err != nil {
 			return nil, err
 		}
 
-		// add nonzero field values as defaults
-		for _, spec := range cmd.specs {
-			if v := p.val(spec.dest); v.IsValid() && !isZero(v) {
-				if defaultVal, ok := v.Interface().(encoding.TextMarshaler); ok {
-					str, err := defaultVal.MarshalText()
-					if err != nil {
-						return nil, fmt.Errorf("%v: error marshaling default value to string: %v", spec.dest, err)
-					}
-					spec.defaultVal = string(str)
-				} else {
-					spec.defaultVal = fmt.Sprintf("%v", v)
-				}
+		// for backwards compatibility, add nonzero field values as defaults
+		// this applies only to the top-level command, not to subcommands (this inconsistency
+		// is the reason that this method for setting default values was deprecated)
+		for _, spec := range p.cmd.specs() {
+			// get the value
+			defaultString, defaultValue, err := p.defaultVal(spec.dest)
+			if err != nil {
+				return nil, err
 			}
-		}
 
-		p.cmd.specs = append(p.cmd.specs, cmd.specs...)
-		p.cmd.subcommands = append(p.cmd.subcommands, cmd.subcommands...)
+			// if the value is the "zero value" (e.g. nil pointer, empty struct) then ignore
+			if defaultString == "" {
+				continue
+			}
+
+			// store as a default
+			spec.defaultString = defaultString
+			spec.defaultValue = defaultValue
+		}
 
 		if dest, ok := dest.(Versioned); ok {
 			p.version = dest.Version()
@@ -232,29 +283,56 @@ func NewParser(config Config, dests ...interface{}) (*Parser, error) {
 		if dest, ok := dest.(Described); ok {
 			p.description = dest.Description()
 		}
+		if dest, ok := dest.(Epilogued); ok {
+			p.epilogue = dest.Epilogue()
+		}
 	}
 
 	return &p, nil
 }
 
-func cmdFromStruct(name string, dest path, t reflect.Type) (*command, error) {
+// parseFieldsFromStructPointer ensures the destination structure is a pointer
+// to a struct. This function should be called when parsing commands or
+// subcommands as they can only be a struct pointer.
+func (cmd *command) parseFieldsFromStructPointer(t reflect.Type, insideGroup bool) error {
 	// commands can only be created from pointers to structs
 	if t.Kind() != reflect.Ptr {
-		return nil, fmt.Errorf("subcommands must be pointers to structs but %s is a %s",
-			dest, t.Kind())
+		return fmt.Errorf("subcommands must be pointers to structs but %s is a %s",
+			cmd.dest, t.Kind())
 	}
 
 	t = t.Elem()
 	if t.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("subcommands must be pointers to structs but %s is a pointer to %s",
-			dest, t.Kind())
+		return fmt.Errorf("subcommands must be pointers to structs but %s is a pointer to %s",
+			cmd.dest, t.Kind())
+	}
+	return cmd.parseStruct(t, insideGroup)
+}
+
+// parseFieldsFromStructOrStructPointer ensures the destination structure is
+// either a pointer to a struct, or a struct. This function should be called
+// when parsing option groups as they can only be a struct, or a pointer to one.
+func (cmd *command) parseFieldsFromStructOrStructPointer(t reflect.Type, insideGroup bool) error {
+	// option groups can only be created from structs or pointers to structs
+	typeHint := ""
+	if t.Kind() == reflect.Ptr {
+		typeHint = "a pointer to "
+		t = t.Elem()
 	}
 
-	cmd := command{
-		name: name,
-		dest: dest,
+	if t.Kind() != reflect.Struct {
+		return fmt.Errorf("option groups must be structs or pointers to structs, but %s is %s%s",
+			cmd.dest, typeHint, t.Kind())
 	}
 
+	return cmd.parseStruct(t, insideGroup)
+}
+
+// parseStruct populates the command instance based on the type and annotations
+// of the target struct. As these command instances are used for either (sub)
+// commands or option groups, please refer to the parseFieldsFromStructPointer
+// or parseFieldsFromStructOrStructPointer respectively.
+func (cmd *command) parseStruct(t reflect.Type, insideGroup bool) error {
 	var errs []string
 	walkFields(t, func(field reflect.StructField, t reflect.Type) bool {
 		// check for the ignore switch in the tag
@@ -276,7 +354,7 @@ func cmdFromStruct(name string, dest path, t reflect.Type) (*command, error) {
 		}
 
 		// duplicate the entire path to avoid slice overwrites
-		subdest := dest.Child(field)
+		subdest := cmd.dest.Child(field)
 		spec := spec{
 			dest:  subdest,
 			field: field,
@@ -288,13 +366,7 @@ func cmdFromStruct(name string, dest path, t reflect.Type) (*command, error) {
 			spec.help = help
 		}
 
-		defaultVal, hasDefault := field.Tag.Lookup("default")
-		if hasDefault {
-			spec.defaultVal = defaultVal
-		}
-
 		// Look at the tag
-		var isSubcommand bool // tracks whether this field is a subcommand
 		for _, key := range strings.Split(tag, ",") {
 			if key == "" {
 				continue
@@ -319,11 +391,6 @@ func cmdFromStruct(name string, dest path, t reflect.Type) (*command, error) {
 				}
 				spec.short = key[1:]
 			case key == "required":
-				if hasDefault {
-					errs = append(errs, fmt.Sprintf("%s.%s: 'required' cannot be used when a default value is specified",
-						t.Name(), field.Name))
-					return false
-				}
 				spec.required = true
 			case key == "positional":
 				spec.positional = true
@@ -339,24 +406,55 @@ func cmdFromStruct(name string, dest path, t reflect.Type) (*command, error) {
 					spec.env = strings.ToUpper(field.Name)
 				}
 			case key == "subcommand":
+				subCmd := command{
+					name:   value,
+					dest:   subdest,
+					parent: cmd,
+					help:   field.Tag.Get("help"),
+				}
+				cmd.subcommands = append(cmd.subcommands, &subCmd)
+
+				if insideGroup {
+					errs = append(errs, fmt.Sprintf("%s.%s: %s subcommands cannot be part of option groups",
+						t.Name(), field.Name, field.Type.String()))
+					return false
+				}
+
 				// decide on a name for the subcommand
-				cmdname := value
-				if cmdname == "" {
-					cmdname = strings.ToLower(field.Name)
+				if subCmd.name == "" {
+					subCmd.name = strings.ToLower(field.Name)
 				}
 
 				// parse the subcommand recursively
-				subcmd, err := cmdFromStruct(cmdname, subdest, field.Type)
+				err := subCmd.parseFieldsFromStructPointer(field.Type, false)
 				if err != nil {
 					errs = append(errs, err.Error())
 					return false
 				}
 
-				subcmd.parent = &cmd
-				subcmd.help = field.Tag.Get("help")
+				return true
+			case key == "group":
+				// parse the option group recursively
+				optGrp := command{
+					name:   value,
+					dest:   subdest,
+					parent: cmd,
+					help:   field.Tag.Get("help"),
+				}
+				cmd.groups = append(cmd.groups, &optGrp)
 
-				cmd.subcommands = append(cmd.subcommands, subcmd)
-				isSubcommand = true
+				// decide on a name for the group
+				if optGrp.name == "" {
+					optGrp.name = strings.Title(field.Name)
+				}
+
+				err := optGrp.parseFieldsFromStructOrStructPointer(field.Type, true)
+				if err != nil {
+					errs = append(errs, err.Error())
+					return false
+				}
+
+				return false
 			default:
 				errs = append(errs, fmt.Sprintf("unrecognized tag '%s' on field %s", key, tag))
 				return false
@@ -372,47 +470,77 @@ func cmdFromStruct(name string, dest path, t reflect.Type) (*command, error) {
 			spec.placeholder = strings.ToUpper(spec.field.Name)
 		}
 
-		// Check whether this field is supported. It's good to do this here rather than
+		// check whether this field is supported. It's good to do this here rather than
 		// wait until ParseValue because it means that a program with invalid argument
 		// fields will always fail regardless of whether the arguments it received
 		// exercised those fields.
-		if !isSubcommand {
-			cmd.specs = append(cmd.specs, &spec)
+		var err error
+		spec.cardinality, err = cardinalityOf(field.Type)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s.%s: %s fields are not supported",
+				t.Name(), field.Name, field.Type.String()))
+			return false
+		}
 
-			var err error
-			spec.cardinality, err = cardinalityOf(field.Type)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("%s.%s: %s fields are not supported",
-					t.Name(), field.Name, field.Type.String()))
-				return false
-			}
-			if spec.cardinality == multiple && hasDefault {
+		defaultString, hasDefault := field.Tag.Lookup("default")
+		if hasDefault {
+			// we do not support default values for maps and slices
+			if spec.cardinality == multiple {
 				errs = append(errs, fmt.Sprintf("%s.%s: default values are not supported for slice or map fields",
 					t.Name(), field.Name))
 				return false
 			}
+
+			// a required field cannot also have a default value
+			if spec.required {
+				errs = append(errs, fmt.Sprintf("%s.%s: 'required' cannot be used when a default value is specified",
+					t.Name(), field.Name))
+				return false
+			}
+
+			// parse the default value
+			spec.defaultString = defaultString
+			if field.Type.Kind() == reflect.Ptr {
+				// here we have a field of type *T and we create a new T, no need to dereference
+				// in order for the value to be settable
+				spec.defaultValue = reflect.New(field.Type.Elem())
+			} else {
+				// here we have a field of type T and we create a new T and then dereference it
+				// so that the resulting value is settable
+				spec.defaultValue = reflect.New(field.Type).Elem()
+			}
+			err := scalar.ParseValue(spec.defaultValue, defaultString)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("%s.%s: error processing default value: %v", t.Name(), field.Name, err))
+				return false
+			}
 		}
+
+		// add the spec to the list of specs
+		cmd.options = append(cmd.options, &spec)
 
 		// if this was an embedded field then we already returned true up above
 		return false
 	})
 
 	if len(errs) > 0 {
-		return nil, errors.New(strings.Join(errs, "\n"))
+		return errors.New(strings.Join(errs, "\n"))
 	}
 
 	// check that we don't have both positionals and subcommands
 	var hasPositional bool
-	for _, spec := range cmd.specs {
+	for _, spec := range cmd.options {
 		if spec.positional {
 			hasPositional = true
 		}
 	}
 	if hasPositional && len(cmd.subcommands) > 0 {
-		return nil, fmt.Errorf("%s cannot have both subcommands and positional arguments", dest)
+		return fmt.Errorf("%s cannot have both subcommands and positional arguments",
+			cmd.dest)
+
 	}
 
-	return &cmd, nil
+	return nil
 }
 
 // Parse processes the given command line option, storing the results in the field
@@ -431,6 +559,20 @@ func (p *Parser) Parse(args []string) error {
 		}
 	}
 	return err
+}
+
+func (p *Parser) MustParse(args []string) {
+	err := p.Parse(args)
+	switch {
+	case err == ErrHelp:
+		p.writeHelpForSubcommand(p.config.Out, p.lastCmd)
+		p.config.Exit(0)
+	case err == ErrVersion:
+		fmt.Fprintln(p.config.Out, p.version)
+		p.config.Exit(0)
+	case err != nil:
+		p.failWithSubcommand(err.Error(), p.lastCmd)
+	}
 }
 
 // process environment vars for the given arguments
@@ -489,8 +631,7 @@ func (p *Parser) process(args []string) error {
 	p.lastCmd = curCmd
 
 	// make a copy of the specs because we will add to this list each time we expand a subcommand
-	specs := make([]*spec, len(curCmd.specs))
-	copy(specs, curCmd.specs)
+	specs := curCmd.specs()
 
 	// deal with environment vars
 	if !p.config.IgnoreEnv {
@@ -525,16 +666,20 @@ func (p *Parser) process(args []string) error {
 				return fmt.Errorf("invalid subcommand: %s", arg)
 			}
 
-			// instantiate the field to point to a new struct
-			v := p.val(subcmd.dest)
-			v.Set(reflect.New(v.Type().Elem())) // we already checked that all subcommands are struct pointers
+			// ensure the command struct exists (is not a nil pointer)
+			p.val(subcmd.dest)
 
 			// add the new options to the set of allowed options
-			specs = append(specs, subcmd.specs...)
+			if p.config.StrictSubcommands {
+				specs = make([]*spec, len(subcmd.specs()))
+				copy(specs, subcmd.specs())
+			} else {
+				specs = append(specs, subcmd.specs()...)
+			}
 
 			// capture environment vars for these new options
 			if !p.config.IgnoreEnv {
-				err := p.captureEnvVars(subcmd.specs, wasPresent)
+				err := p.captureEnvVars(subcmd.specs(), wasPresent)
 				if err != nil {
 					return err
 				}
@@ -659,11 +804,14 @@ func (p *Parser) process(args []string) error {
 			}
 			return errors.New(msg)
 		}
-		if spec.defaultVal != "" {
-			err := scalar.ParseValue(p.val(spec.dest), spec.defaultVal)
-			if err != nil {
-				return fmt.Errorf("error processing default value for %s: %v", name, err)
-			}
+
+		if spec.defaultValue.IsValid() && !p.config.IgnoreDefault {
+			// One issue here is that if the user now modifies the value then
+			// the default value stored in the spec will be corrupted. There
+			// is no general way to "deep-copy" values in Go, and we still
+			// support the old-style method for specifying defaults as
+			// Go values assigned directly to the struct field, so we are stuck.
+			p.val(spec.dest).Set(spec.defaultValue)
 		}
 	}
 
@@ -688,20 +836,57 @@ func isFlag(s string) bool {
 	return strings.HasPrefix(s, "-") && strings.TrimLeft(s, "-") != ""
 }
 
-// val returns a reflect.Value corresponding to the current value for the
-// given path
-func (p *Parser) val(dest path) reflect.Value {
+// defaultVal returns the string representation of the value at dest if it is
+// reachable without traversing nil pointers, but only if it does not represent
+// the default value for the type.
+func (p *Parser) defaultVal(dest path) (string, reflect.Value, error) {
 	v := p.roots[dest.root]
 	for _, field := range dest.fields {
 		if v.Kind() == reflect.Ptr {
 			if v.IsNil() {
-				return reflect.Value{}
+				return "", v, nil
 			}
 			v = v.Elem()
 		}
 
 		v = v.FieldByIndex(field.Index)
 	}
+
+	if !v.IsValid() || isZero(v) {
+		return "", v, nil
+	}
+
+	if defaultVal, ok := v.Interface().(encoding.TextMarshaler); ok {
+		str, err := defaultVal.MarshalText()
+		if err != nil {
+			return "", v, fmt.Errorf("%v: error marshaling default value to string: %w", dest, err)
+		}
+		return string(str), v, nil
+	}
+
+	return fmt.Sprintf("%v", v), v, nil
+}
+
+// val returns a reflect.Value corresponding to the current value for the
+// given path initiating nil pointers in the path
+func (p *Parser) val(dest path) reflect.Value {
+	v := p.roots[dest.root]
+	for _, field := range dest.fields {
+		if v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				v.Set(reflect.New(v.Type().Elem()))
+			}
+			v = v.Elem()
+		}
+
+		v = v.FieldByIndex(field.Index)
+	}
+
+	// Don't return a nil-pointer
+	if v.Kind() == reflect.Ptr && v.IsNil() {
+		v.Set(reflect.New(v.Type().Elem()))
+	}
+
 	return v
 }
 
