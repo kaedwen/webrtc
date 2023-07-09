@@ -47,7 +47,7 @@ jobs:
             goarch: arm
             deps: gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
             prefix: arm-linux-gnueabihf
-          - os: darwin
+          - os: linux
             arch: arm64
             goarch: arm64
             deps: gcc-aarch64-linux-gnu libc6-dev-arm64-cross
