@@ -62,7 +62,7 @@ jobs:
         env:
           GOOS: ${{ matrix.target.os }}
           GOARCH: ${{ matrix.target.arch }}
-          CC: ${{ matrix.target.prefix }}-gcc
+          CC: ${{ matrix.target.prefix }}gcc
           PKG_CONFIG_PATH: /usr/lib/${{ matrix.target.prefix }}/pkgconfig
       - uses: actions/upload-artifact@v3
         with:
