@@ -39,10 +39,12 @@ jobs:
         target:
           - os: linux
             arch: amd64
+            goarch: amd64
             deps: ''
             prefix: ''
           - os: linux
             arch: armhf
+            goarch: arm
             deps: gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
             prefix: arm-linux-gnueabihf-
     steps:
@@ -61,7 +63,7 @@ jobs:
       - run: make build-static
         env:
           GOOS: ${{ matrix.target.os }}
-          GOARCH: ${{ matrix.target.arch }}
+          GOARCH: ${{ matrix.target.goarch }}
           CC: ${{ matrix.target.prefix }}gcc
           PKG_CONFIG_PATH: /usr/lib/${{ matrix.target.prefix }}/pkgconfig
       - uses: actions/upload-artifact@v3
