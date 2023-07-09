@@ -8,9 +8,17 @@ import (
 )
 
 type Config struct {
-	Logging ConfigLogging `arg:"group:Logging"`
-	Stream  ConfigStream  `arg:"group:Stream"`
-	Http    ConfigHTTP    `arg:"group:Http"`
+	VideoOut ConfigVideoOutputStream `arg:"group:VideoOut"`
+	AudioOut ConfigAudioOutputStream `arg:"group:AudioOut"`
+	AudioIn  ConfigAudioInputStream  `arg:"group:AudioIn"`
+	Logging  ConfigLogging           `arg:"group:Logging"`
+	Http     ConfigHTTP              `arg:"group:Http"`
+}
+
+type ConfigStream struct {
+	VideoOut ConfigVideoOutputStream
+	AudioOut ConfigAudioOutputStream
+	AudioIn  ConfigAudioInputStream
 }
 
 type ConfigLogging struct {
@@ -23,12 +31,6 @@ type ConfigHTTP struct {
 	PathGetLiveness  string  `arg:"env:HTTP_PATH_LIVENESS" default:"/healthz"`
 	PathGetReadiness string  `arg:"env:HTTP_PATH_READINESS" default:"/readyz"`
 	StaticPath       *string `arg:"--http-static,env:HTTP_STATIC"`
-}
-
-type ConfigStream struct {
-	VideoOut ConfigVideoOutputStream `arg:"group:VideoOut"`
-	AudioOut ConfigAudioOutputStream `arg:"group:AudioOut"`
-	AudioIn  ConfigAudioInputStream  `arg:"group:AudioIn"`
 }
 
 type ConfigVideoOutputStream struct {
@@ -53,6 +55,14 @@ type ConfigAudioInputStream struct {
 	Device     *string `arg:"--audio-device,env:AUDIO_DEVICE"`
 	Codec      string  `arg:"--audio-codec,env:AUDIO_CODEC" default:"opus"`
 	Channels   uint    `arg:"--audio-channels,env:AUDIO_CHANNELS" default:"1"`
+}
+
+func (c *Config) Stream() *ConfigStream {
+	return &ConfigStream{
+		VideoOut: c.VideoOut,
+		AudioOut: c.AudioOut,
+		AudioIn:  c.AudioIn,
+	}
 }
 
 func (c *ConfigHTTP) Address() string {

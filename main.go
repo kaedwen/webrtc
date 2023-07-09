@@ -28,7 +28,7 @@ func main() {
 
 	http := server.NewHttpServer(lg.With(zap.String("context", "server")), &cfg)
 
-	webrtc.NewWebrtcHandler(ctx, lg.With(zap.String("context", "webrtc")), &cfg.Stream, http.Hndl)
+	webrtc.NewWebrtcHandler(ctx, lg.With(zap.String("context", "webrtc")), cfg.Stream(), http.Hndl)
 
 	http.ListenAndServe(ctx, cfg.Http.Address())
 
