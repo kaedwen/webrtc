@@ -28,7 +28,6 @@ type ConfigLogging struct {
 type ConfigHTTP struct {
 	Host             string  `arg:"--http-host,env:HTTP_HOST" default:"0.0.0.0"`
 	Port             uint    `arg:"--http-port,env:HTTP_PORT" default:"8080"`
-	PortTls          uint    `arg:"--http-port,env:HTTP_PORT" default:"8443"`
 	Tls              bool    `arg:"--http-tls,env:HTTP_TLS" default:"true"`
 	TlsKey           *string `arg:"--http-tls-key,env:HTTP_TLS_KEY"`
 	TlsCert          *string `arg:"--http-tls-cert,env:HTTP_TLS_CERT"`
@@ -71,10 +70,6 @@ func (c *Config) Stream() *ConfigStream {
 
 func (c *ConfigHTTP) Address() string {
 	return net.JoinHostPort(c.Host, fmt.Sprint(c.Port))
-}
-
-func (c *ConfigHTTP) AddressTls() string {
-	return net.JoinHostPort(c.Host, fmt.Sprint(c.PortTls))
 }
 
 func (c *Config) MustParse() {
