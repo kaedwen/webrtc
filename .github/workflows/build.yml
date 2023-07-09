@@ -15,7 +15,7 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  build:
+  build-static:
     runs-on: ubuntu-latest
     container: "debian:stable-slim"
     steps:
@@ -25,19 +25,37 @@ jobs:
           node-version: 18
           cache-dependency-path: static
           cache: npm
-      - name: Build Frontend
-        run: npm --prefix static ci && npm --prefix static run build
+      - run: npm --prefix static ci && npm --prefix static run build
+      - uses: actions/upload-artifact@v3
+        with:
+          name: static
+          path: static/dist
+  build:
+    needs: build-static
+    runs-on: ubuntu-latest
+    container: "debian:stable-slim"
+    strategy:
+      matrix:
+        target:
+          - arch: amd64
+            deps: []
+          - arch: armhf
+            deps: gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
+    steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
           go-version: 'stable'
-      - name: Prepare Backend
-        run: |
+      - run: |
+          dpkg --add-architecture ${{ matrix.target.arch }}
           apt-get update
-          apt-get install --yes --no-install-recommends make gcc libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
-      - name: Build Backend
-        run: make build-static
-      - name: Archive artifacts
-        uses: actions/upload-artifact@v3
+          apt-get install --yes --no-install-recommends make gcc libgstreamer1.0-dev:${{ matrix.target.arch }} libgstreamer-plugins-base1.0-dev:${{ matrix.target.arch }} ${{ matrix.target.deps }}
+      - uses: actions/download-artifact@master
+        with:
+          name: static
+          path: static/dist
+      - run: make build-static
+      - uses: actions/upload-artifact@v3
         with:
           name: binary
           path: service
