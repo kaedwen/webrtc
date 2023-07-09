@@ -37,10 +37,14 @@ jobs:
     strategy:
       matrix:
         target:
-          - arch: amd64
+          - os: linux
+            arch: amd64
             deps: ''
-          - arch: armhf
+            prefix: ''
+          - os: linux
+            arch: armhf
             deps: gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
+            prefix: arm-linux-gnueabihf-
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
@@ -55,6 +59,11 @@ jobs:
           name: static
           path: static/dist
       - run: make build-static
+        env:
+          GOOS: ${{ matrix.target.os }}
+          GOARCH: ${{ matrix.target.arch }}
+          CC: ${{ matrix.target.prefix }}-gcc
+          PKG_CONFIG_PATH: /usr/lib/${{ matrix.target.prefix }}/pkgconfig
       - uses: actions/upload-artifact@v3
         with:
           name: binary
