@@ -38,7 +38,7 @@ jobs:
       matrix:
         target:
           - arch: amd64
-            deps: []
+            deps: ''
           - arch: armhf
             deps: gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
     steps:
