@@ -47,6 +47,11 @@ jobs:
             goarch: arm
             deps: gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
             prefix: arm-linux-gnueabihf
+          - os: darwin
+            arch: arm64
+            goarch: arm64
+            deps: gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+            prefix: aarch64-linux-gnu
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
