@@ -26,4 +26,4 @@ podman run \
   --volume ./:/data \
   --workdir /data \
   ${CONTAINER} \
-  go build -mod=vendor -tags=embed -o service-${GOOS}-${GOARCH} main.go
+  go build -mod=vendor -tags=embed -o service-linux-${GOARCH} main.go
