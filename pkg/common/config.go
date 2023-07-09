@@ -8,9 +8,9 @@ import (
 )
 
 type Config struct {
-	Logging ConfigLogging `arg:"-"`
-	Stream  ConfigStream  `arg:"-"`
-	Http    ConfigHTTP    `arg:"-"`
+	Logging ConfigLogging `arg:"group:Logging"`
+	Stream  ConfigStream  `arg:"group:Stream"`
+	Http    ConfigHTTP    `arg:"group:Http"`
 }
 
 type ConfigLogging struct {
@@ -26,9 +26,9 @@ type ConfigHTTP struct {
 }
 
 type ConfigStream struct {
-	VideoOut ConfigVideoOutputStream `arg:"-"`
-	AudioOut ConfigAudioOutputStream `arg:"-"`
-	AudioIn  ConfigAudioInputStream  `arg:"-"`
+	VideoOut ConfigVideoOutputStream `arg:"group:VideoOut"`
+	AudioOut ConfigAudioOutputStream `arg:"group:AudioOut"`
+	AudioIn  ConfigAudioInputStream  `arg:"group:AudioIn"`
 }
 
 type ConfigVideoOutputStream struct {
@@ -60,10 +60,5 @@ func (c *ConfigHTTP) Address() string {
 }
 
 func (c *Config) MustParse() {
-	arg.MustParse(&c.Logging)
-	arg.MustParse(&c.Stream.VideoOut)
-	arg.MustParse(&c.Stream.AudioOut)
-	arg.MustParse(&c.Stream.AudioIn)
-	arg.MustParse(&c.Http)
 	arg.MustParse(c)
 }
