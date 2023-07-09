@@ -62,10 +62,10 @@ jobs:
           path: static/dist
       - run: |
           PREFIX="${{ matrix.target.prefix }}"
-          echo "${{ matrix.target.os }}" >> $GOOS
-          echo "${{ matrix.target.goarch }}" >> $GOARCH
-          echo "${PREFIX:+$PREFIX-}gcc" >> $CC
-          echo "/usr/lib/${{ matrix.target.prefix }}/pkgconfig" >> $PKG_CONFIG_PATH
+          echo "GOOS=${{ matrix.target.os }}" >> $GITHUB_ENV
+          echo "GOARCH=${{ matrix.target.goarch }}" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=/usr/lib/${{ matrix.target.prefix }}/pkgconfig" >> $GITHUB_ENV
+          echo "CC=${PREFIX:+$PREFIX-}gcc" >> $GITHUB_ENV
       - run: make build-static
       - uses: actions/upload-artifact@v3
         with:
