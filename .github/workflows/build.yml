@@ -68,6 +68,6 @@ jobs:
           PKG_CONFIG_PATH: /usr/lib/${{ matrix.target.prefix }}/pkgconfig
       - uses: actions/upload-artifact@v3
         with:
-          name: binary
+          name: service-${{ matrix.target.os }}-${{ matrix.target.goarch }}
           path: service
           retention-days: 5
