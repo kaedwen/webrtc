@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"time"
@@ -24,6 +25,7 @@ type SignalingHandle struct {
 type HttpServer struct {
 	http.Server
 	lg   *zap.Logger
+	cfg  *common.ConfigHTTP
 	Hndl chan *SignalingHandle
 }
 
@@ -35,9 +37,10 @@ func NewSignalingHandle(id string) SignalingHandle {
 	}
 }
 
-func NewHttpServer(lg *zap.Logger, cfg *common.Config) *HttpServer {
+func NewHttpServer(lg *zap.Logger, cfg *common.ConfigHTTP) *HttpServer {
 	h := HttpServer{
 		Hndl: make(chan *SignalingHandle, 10),
+		cfg:  cfg,
 		lg:   lg,
 	}
 
@@ -45,7 +48,7 @@ func NewHttpServer(lg *zap.Logger, cfg *common.Config) *HttpServer {
 	engine.GET("/signaling/:id", h.signalingHandler)
 
 	// static handler
-	static.SetupHandler(engine, cfg.Http)
+	static.SetupHandler(engine, cfg)
 
 	// set out handler
 	h.Handler = engine
@@ -53,18 +56,55 @@ func NewHttpServer(lg *zap.Logger, cfg *common.Config) *HttpServer {
 	return &h
 }
 
-func (h *HttpServer) ListenAndServe(ctx context.Context, addr string) {
-	go func() {
-
+func (h *HttpServer) ListenAndServe(ctx context.Context) error {
+	if h.cfg.Tls {
 		// set the configured address
-		h.Addr = addr
+		h.Addr = h.cfg.Address()
 
-		// and listen
-		if err := h.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			h.lg.Fatal("listen failed", zap.Error(err))
+		if h.cfg.TlsCert != nil && h.cfg.TlsKey != nil {
+			cert, err := tls.LoadX509KeyPair(*h.cfg.TlsCert, *h.cfg.TlsKey)
+			if err != nil {
+				return err
+			}
+
+			h.Server.TLSConfig = &tls.Config{
+				Certificates: []tls.Certificate{cert},
+			}
+		} else {
+			h.lg.Info("creating self signed certificate")
+			var cert *tls.Certificate
+			duration, cert, err := common.Time(func() (*tls.Certificate, error) {
+				return common.GenerateSelfSigned()
+			})
+			if err != nil {
+				return err
+			}
+			h.lg.Info("certificate created", zap.Duration("elapsed", duration))
+
+			h.Server.TLSConfig = &tls.Config{
+				Certificates: []tls.Certificate{*cert},
+			}
 		}
 
-	}()
+		go func() {
+			// and listen
+			if err := h.Server.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+				h.lg.Fatal("listen failed", zap.Error(err))
+			}
+		}()
+	} else {
+		// set the configured address
+		h.Addr = h.cfg.Address()
+
+		go func() {
+			// and listen
+			if err := h.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				h.lg.Fatal("listen failed", zap.Error(err))
+			}
+		}()
+	}
+
+	return nil
 }
 
 func (h *HttpServer) TearDown() error {

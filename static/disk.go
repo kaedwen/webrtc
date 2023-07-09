@@ -38,7 +38,7 @@ func (s staticDiskSource) Open(p string) (common.StaticSourceFile, error) {
 	return &staticSourceFile{t}, nil
 }
 
-func SetupHandler(e *gin.Engine, cfg common.ConfigHTTP) {
+func SetupHandler(e *gin.Engine, cfg *common.ConfigHTTP) {
 	if cfg.StaticPath != nil {
 		handler := common.NewStaticHandler(staticDiskSource{*cfg.StaticPath}, "index.html")
 		e.NoRoute(func(c *gin.Context) {

@@ -109,7 +109,7 @@ func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.Con
 		if cfg.Device != nil {
 			properties["device"] = *cfg.Device
 		} else {
-			properties["device-name"] = cfg.DeviceName
+			properties["device"] = cfg.DeviceName
 		}
 	}
 
