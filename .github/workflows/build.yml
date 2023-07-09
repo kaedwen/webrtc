@@ -55,7 +55,7 @@ jobs:
       - run: |
           dpkg --add-architecture ${{ matrix.target.arch }}
           apt-get update
-          apt-get install --yes --no-install-recommends make gcc libgstreamer1.0-dev:${{ matrix.target.arch }} libgstreamer-plugins-base1.0-dev:${{ matrix.target.arch }} ${{ matrix.target.deps }}
+          apt-get install --yes --no-install-recommends make gcc libglib2.0-dev:${{ matrix.target.arch }} libgstreamer1.0-dev:${{ matrix.target.arch }} libgstreamer-plugins-base1.0-dev:${{ matrix.target.arch }} ${{ matrix.target.deps }}
       - uses: actions/download-artifact@master
         with:
           name: static
