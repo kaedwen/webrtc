@@ -1,6 +1,6 @@
 # Webrtc streamer based on golang (pion) and gstreamer
 
-This project demonstrates who to stream any source (thanks to gstreamer) in a webrtc session using golang pion to a webrtc client (angular).
+This project demonstrates how to stream any source (thanks to gstreamer) in a webrtc session using golang pion to a webrtc client (angular).
 
 ## build locally
 
