@@ -32,6 +32,7 @@ type ConfigRing struct {
 	JingleName  string  `arg:"--jingle-name,env:JINGLE_NAME" default:"ding-dong.wav"`
 	JinglePath  *string `arg:"--jingle-path,env:JINGLE_PATH"`
 	SonosTarget string  `arg:"--sonos-target,env:SONOS_TARGET" default:"-"`
+	SonosVolume int     `arg:"--sonos-volume,env:SONOS_VOLUME" default:"50"`
 }
 
 type ConfigHTTP struct {

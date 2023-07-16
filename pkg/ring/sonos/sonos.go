@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/mdns"
+	"github.com/kaedwen/webrtc/pkg/common"
 	"go.uber.org/zap"
 )
 
@@ -48,7 +49,7 @@ type sonosAudioClip struct {
 
 type SonosHandler struct {
 	lg      *zap.Logger
-	target  string
+	cfg     *common.ConfigRing
 	players map[string]*SonosPlayer
 }
 
@@ -66,8 +67,8 @@ func NewSonosPlayer(address *url.URL) (*SonosPlayer, error) {
 	return &SonosPlayer{client, address, sonosInfo{}}, nil
 }
 
-func NewSonosHandler(lg *zap.Logger, target string) (*SonosHandler, error) {
-	return &SonosHandler{lg, target, make(map[string]*SonosPlayer)}, nil
+func NewSonosHandler(lg *zap.Logger, cfg *common.ConfigRing) (*SonosHandler, error) {
+	return &SonosHandler{lg, cfg, make(map[string]*SonosPlayer)}, nil
 }
 
 func (p *SonosPlayer) init() error {
@@ -103,12 +104,12 @@ func (p *SonosPlayer) init() error {
 	return nil
 }
 
-func (p *SonosPlayer) Play(uri *url.URL) error {
+func (p *SonosPlayer) Play(uri *url.URL, volume int) error {
 	sab := sonosAudioClip{
 		Name:      "Pull Bell",
 		AppId:     "com.acme.app",
 		StreamUrl: uri.String(),
-		Volume:    5,
+		Volume:    volume,
 	}
 
 	b, err := json.Marshal(sab)
@@ -163,6 +164,11 @@ func (h *SonosHandler) Watch(ctx context.Context) error {
 						continue
 					}
 
+					if h.cfg.SonosTarget != "-" && p.info.Device.Name != h.cfg.SonosTarget {
+						h.lg.Info("skip player", zap.String("name", p.info.Device.Name))
+						continue
+					}
+
 					h.players[e.Name] = p
 				}
 			}
@@ -175,7 +181,7 @@ func (h *SonosHandler) Watch(ctx context.Context) error {
 
 func (h *SonosHandler) Play(uri *url.URL) error {
 	for _, p := range h.players {
-		if err := p.Play(uri); err != nil {
+		if err := p.Play(uri, h.cfg.SonosVolume); err != nil {
 			h.lg.Error("failed to play", zap.String("address", p.address.String()), zap.Error(err))
 		}
 	}
