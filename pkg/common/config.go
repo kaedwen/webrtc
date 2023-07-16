@@ -12,6 +12,7 @@ type Config struct {
 	AudioOut ConfigAudioOutputStream `arg:"group:AudioOut"`
 	AudioIn  ConfigAudioInputStream  `arg:"group:AudioIn"`
 	Logging  ConfigLogging           `arg:"group:Logging"`
+	Ring     ConfigRing              `arg:"group:Ring"`
 	Http     ConfigHTTP              `arg:"group:Http"`
 }
 
@@ -23,6 +24,14 @@ type ConfigStream struct {
 
 type ConfigLogging struct {
 	Level string `arg:"--log-level,env:LOG_LEVEL" default:"debug"`
+}
+
+type ConfigRing struct {
+	Device      string  `arg:"--input-device,env:INPUT_DEVICE" default:"/dev/input/by-path/platform-gpio-keys-user-event"`
+	Key         string  `arg:"--ring-key" default:"KEY_F1"`
+	JingleName  string  `arg:"--jingle-name,env:JINGLE_NAME" default:"ding-dong.wav"`
+	JinglePath  *string `arg:"--jingle-path,env:JINGLE_PATH"`
+	SonosTarget string  `arg:"--sonos-target,env:SONOS_TARGET" default:"Living Room"`
 }
 
 type ConfigHTTP struct {

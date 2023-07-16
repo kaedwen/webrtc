@@ -5,8 +5,10 @@ go 1.20
 require (
 	github.com/alexflint/go-arg v1.4.3
 	github.com/gin-gonic/gin v1.9.1
+	github.com/holoplot/go-evdev v0.0.0-20230626094006-70c9462cc0f2
 	github.com/pion/rtcp v1.2.10
 	github.com/pion/webrtc/v3 v3.2.10
+	github.com/szatmary/sonos v0.0.0-20191204204454-000c9219ff0e
 	github.com/tinyzimmer/go-glib v0.0.25
 	github.com/tinyzimmer/go-gst v0.2.33
 	go.uber.org/zap v1.24.0
