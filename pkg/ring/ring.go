@@ -23,7 +23,7 @@ type RingHandler struct {
 }
 
 func NewRingHandler(lg *zap.Logger, cfg *common.ConfigRing) (*RingHandler, error) {
-	spl, err := sonos.NewSonosHandler(lg.With(zap.String("context", "sonos")), cfg.SonosTarget)
+	spl, err := sonos.NewSonosHandler(lg.With(zap.String("context", "sonos")), cfg)
 	if err != nil {
 		return nil, err
 	}
