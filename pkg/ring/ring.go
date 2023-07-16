@@ -11,31 +11,33 @@ import (
 	"go.uber.org/zap"
 )
 
-type Player interface {
-	Play(uri *url.URL) error
+type PlayHandler interface {
+	Play(*url.URL) error
+	Watch(context.Context) error
 }
 
 type RingHandler struct {
-	lg      *zap.Logger
-	cfg     *common.ConfigRing
-	players []Player
+	lg           *zap.Logger
+	cfg          *common.ConfigRing
+	playHandlers []PlayHandler
 }
 
 func NewRingHandler(lg *zap.Logger, cfg *common.ConfigRing) (*RingHandler, error) {
-	spl, err := sonos.NewSonosPlayers(lg.With(zap.String("context", "sonos")), cfg.SonosTarget)
+	spl, err := sonos.NewSonosHandler(lg.With(zap.String("context", "sonos")), cfg.SonosTarget)
 	if err != nil {
 		return nil, err
 	}
 
-	pl := make([]Player, 0, len(spl))
-	for _, sp := range spl {
-		pl = append(pl, sp)
-	}
-
-	return &RingHandler{lg, cfg, pl}, nil
+	return &RingHandler{lg, cfg, []PlayHandler{spl}}, nil
 }
 
 func (h *RingHandler) Watch(ctx context.Context) error {
+	for _, p := range h.playHandlers {
+		if err := p.Watch(ctx); err != nil {
+			return err
+		}
+	}
+
 	d, err := evdev.Open(h.cfg.Device)
 	if err != nil {
 		return err
@@ -61,7 +63,7 @@ func (h *RingHandler) Watch(ctx context.Context) error {
 			e, err := d.ReadOne()
 			if err == nil && e.Code == key && e.Value == 0 {
 				tu := bu.JoinPath(h.cfg.JingleName)
-				for _, p := range h.players {
+				for _, p := range h.playHandlers {
 					if err := p.Play(tu); err != nil {
 						h.lg.Error("failed to play", zap.Error(err))
 					}
