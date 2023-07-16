@@ -22,12 +22,17 @@ type RingHandler struct {
 }
 
 func NewRingHandler(lg *zap.Logger, cfg *common.ConfigRing) (*RingHandler, error) {
-	sp, err := sonos.NewSonosPlayer(lg.With(zap.String("context", "sonos")), cfg.SonosTarget)
+	spl, err := sonos.NewSonosPlayers(lg.With(zap.String("context", "sonos")), cfg.SonosTarget)
 	if err != nil {
 		return nil, err
 	}
 
-	return &RingHandler{lg, cfg, []Player{sp}}, nil
+	pl := make([]Player, 0, len(spl))
+	for _, sp := range spl {
+		pl = append(pl, sp)
+	}
+
+	return &RingHandler{lg, cfg, pl}, nil
 }
 
 func (h *RingHandler) Watch(ctx context.Context) error {

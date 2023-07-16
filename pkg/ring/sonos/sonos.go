@@ -1,7 +1,6 @@
 package sonos
 
 import (
-	"errors"
 	"net/url"
 	"time"
 
@@ -14,13 +13,13 @@ type SonosPlayer struct {
 	zp *so.ZonePlayer
 }
 
-func NewSonosPlayer(lg *zap.Logger, target string) (*SonosPlayer, error) {
-	zp, err := SearchTarget(lg, target)
+func NewSonosPlayers(lg *zap.Logger, target string) ([]*SonosPlayer, error) {
+	spl, err := SearchTargets(lg, target)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SonosPlayer{lg, zp}, nil
+	return spl, nil
 }
 
 func (p *SonosPlayer) Play(uri *url.URL) error {
@@ -32,7 +31,9 @@ func (p *SonosPlayer) Play(uri *url.URL) error {
 	return p.zp.Play()
 }
 
-func SearchTarget(lg *zap.Logger, target string) (*so.ZonePlayer, error) {
+func SearchTargets(lg *zap.Logger, target string) ([]*SonosPlayer, error) {
+	players := make([]*SonosPlayer, 0)
+
 	son, err := so.NewSonos()
 	if err != nil {
 		return nil, err
@@ -40,15 +41,15 @@ func SearchTarget(lg *zap.Logger, target string) (*so.ZonePlayer, error) {
 	defer son.Close()
 
 	found, _ := son.Search()
-	to := time.After(10 * time.Second)
+	to := time.After(5 * time.Second)
 	for {
 		select {
 		case <-to:
-			return nil, errors.New("timeout")
+			return players, nil
 		case zp := <-found:
 			lg.Info("found player", zap.String("name", zp.RoomName()))
-			if zp.RoomName() == target {
-				return zp, nil
+			if target == "-" || zp.RoomName() == target {
+				players = append(players, &SonosPlayer{lg, zp})
 			}
 		}
 	}

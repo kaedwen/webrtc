@@ -31,7 +31,7 @@ type ConfigRing struct {
 	Key         string  `arg:"--ring-key" default:"KEY_F1"`
 	JingleName  string  `arg:"--jingle-name,env:JINGLE_NAME" default:"ding-dong.wav"`
 	JinglePath  *string `arg:"--jingle-path,env:JINGLE_PATH"`
-	SonosTarget string  `arg:"--sonos-target,env:SONOS_TARGET" default:"Living Room"`
+	SonosTarget string  `arg:"--sonos-target,env:SONOS_TARGET" default:"-"`
 }
 
 type ConfigHTTP struct {
