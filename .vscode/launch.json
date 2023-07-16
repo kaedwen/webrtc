@@ -15,7 +15,8 @@
         "VIDEO_OUT_DEVICE": "/dev/video4",
         "AUDIO_OUT_DEVICE": "plughw:0,1,0",
         "INPUT_DEVICE": "/dev/input/event5",
-        "JINGLE_PATH": "${workspaceFolder}/audio"
+        "JINGLE_PATH": "${workspaceFolder}/audio",
+        "SONOS_TARGET": "Living Room"
       }
     },
     {
