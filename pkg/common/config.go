@@ -27,12 +27,12 @@ type ConfigLogging struct {
 }
 
 type ConfigRing struct {
-	Device      string  `arg:"--input-device,env:INPUT_DEVICE" default:"/dev/input/by-path/platform-gpio-keys-user-event"`
-	Key         string  `arg:"--ring-key" default:"KEY_F1"`
-	JingleName  string  `arg:"--jingle-name,env:JINGLE_NAME" default:"ding-dong.wav"`
-	JinglePath  *string `arg:"--jingle-path,env:JINGLE_PATH"`
-	SonosTarget string  `arg:"--sonos-target,env:SONOS_TARGET" default:"-"`
-	SonosVolume int     `arg:"--sonos-volume,env:SONOS_VOLUME" default:"50"`
+	Device        *string `arg:"--input-device,env:INPUT_DEVICE"`
+	Key           string  `arg:"--ring-key" default:"KEY_F1"`
+	JingleBaseUri *string `arg:"--jingle-base-uri,env:JINGLE_BASE_URI"`
+	JinglePath    string  `arg:"--jingle-path,env:JINGLE_PATH" default:"audio/ding-dong.wav"`
+	SonosTarget   string  `arg:"--sonos-target,env:SONOS_TARGET" default:"-"`
+	SonosVolume   int     `arg:"--sonos-volume,env:SONOS_VOLUME" default:"50"`
 }
 
 type ConfigHTTP struct {
@@ -47,11 +47,12 @@ type ConfigHTTP struct {
 }
 
 type ConfigVideoOutputStream struct {
-	Source string `arg:"--video-out-src,env:VIDEO_OUT_SRC" default:"v4l2src"`
-	Device string `arg:"--video-out-device,env:VIDEO_OUT_DEVICE" default:"/dev/video0"`
-	Codec  string `arg:"--video-out-codec,env:VIDEO_OUT_CODEC" default:"vp8"`
-	Height uint   `arg:"--video-out-height,env:VIDEO_OUT_HEIGHT" default:"480"`
-	Width  uint   `arg:"--video-out-width,env:VIDEO_OUT_WIDTH" default:"640"`
+	Source    string `arg:"--video-out-src,env:VIDEO_OUT_SRC" default:"v4l2src"`
+	Device    string `arg:"--video-out-device,env:VIDEO_OUT_DEVICE" default:"/dev/video0"`
+	Codec     string `arg:"--video-out-codec,env:VIDEO_OUT_CODEC" default:"vp8"`
+	Height    uint   `arg:"--video-out-height,env:VIDEO_OUT_HEIGHT" default:"480"`
+	Width     uint   `arg:"--video-out-width,env:VIDEO_OUT_WIDTH" default:"640"`
+	USE_QUEUE bool   `arg:"--video-out-queue,env:VIDEO_OUT_QUEUE" default:"false"`
 }
 
 type ConfigAudioOutputStream struct {
@@ -60,6 +61,7 @@ type ConfigAudioOutputStream struct {
 	Device     *string `arg:"--audio-out-device,env:AUDIO_OUT_DEVICE"`
 	Codec      string  `arg:"--audio-out-codec,env:AUDIO_OUT_CODEC" default:"opus"`
 	Channels   uint    `arg:"--audio-out-channels,env:AUDIO_OUT_CHANNELS" default:"1"`
+	USE_QUEUE  bool    `arg:"--audio-out-queue,env:AUDIO_OUT_QUEUE" default:"false"`
 }
 
 type ConfigAudioInputStream struct {

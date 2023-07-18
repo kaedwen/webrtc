@@ -71,6 +71,15 @@ func CreateVideoPipelineSink(s StreamElement) (*gst.Pipeline, <-chan media.Sampl
 	}
 	elems = append(elems, conv)
 
+	if s.Queue {
+		// add a queue
+		queue, err := gst.NewElement("queue")
+		if err != nil {
+			return nil, nil, err
+		}
+		elems = append(elems, queue)
+	}
+
 	// Create the enc
 	enc, err := gst.NewElement("vp8enc")
 	if err != nil {
@@ -139,6 +148,15 @@ func CreateAudioPipelineSink(s StreamElement) (*gst.Pipeline, <-chan media.Sampl
 		return nil, nil, err
 	}
 	elems = append(elems, conv)
+
+	if s.Queue {
+		// add a queue
+		queue, err := gst.NewElement("queue")
+		if err != nil {
+			return nil, nil, err
+		}
+		elems = append(elems, queue)
+	}
 
 	// Create the enc
 	enc, err := gst.NewElement("opusenc")

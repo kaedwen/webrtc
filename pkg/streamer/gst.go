@@ -30,6 +30,7 @@ type StreamElement struct {
 	Kind       string
 	Properties map[string]interface{}
 	Caps       *StreamElementCaps
+	Queue      bool
 }
 
 func (se StreamElement) ToGstCaps() *gst.Caps {

@@ -32,13 +32,23 @@ func NewRingHandler(lg *zap.Logger, cfg *common.ConfigRing) (*RingHandler, error
 }
 
 func (h *RingHandler) Watch(ctx context.Context) error {
+	if h.cfg.Device == nil {
+		h.lg.Warn("nothing to watch for key press")
+		return nil
+	}
+
+	if h.cfg.JingleBaseUri == nil {
+		h.lg.Warn("missing jingle base uri, nothing to play")
+		return nil
+	}
+
 	for _, p := range h.playHandlers {
 		if err := p.Watch(ctx); err != nil {
 			return err
 		}
 	}
 
-	d, err := evdev.Open(h.cfg.Device)
+	d, err := evdev.Open(*h.cfg.Device)
 	if err != nil {
 		return err
 	}
@@ -48,9 +58,9 @@ func (h *RingHandler) Watch(ctx context.Context) error {
 
 	key := evdev.KEYFromString[h.cfg.Key]
 
-	bu := url.URL{
-		Scheme: "http",
-		Host:   "192.168.60.141:9099",
+	bu, err := url.Parse(*h.cfg.JingleBaseUri)
+	if err != nil {
+		return err
 	}
 
 	go func() {
@@ -62,7 +72,7 @@ func (h *RingHandler) Watch(ctx context.Context) error {
 		for {
 			e, err := d.ReadOne()
 			if err == nil && e.Code == key && e.Value == 0 {
-				tu := bu.JoinPath(h.cfg.JingleName)
+				tu := bu.JoinPath(h.cfg.JinglePath)
 				for _, p := range h.playHandlers {
 					if err := p.Play(tu); err != nil {
 						h.lg.Error("failed to play", zap.Error(err))

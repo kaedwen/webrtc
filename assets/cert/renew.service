@@ -1,0 +1,10 @@
+[Unit]
+Description=Renew certificate
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/ring/renew.env
+ExecStart=/usr/local/bin/renew.sh
+
+[Install]
+WantedBy=multi-user.target

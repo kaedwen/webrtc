@@ -39,12 +39,6 @@ func (s staticDiskSource) Open(p string) (common.StaticSourceFile, error) {
 }
 
 func SetupHandler(e *gin.Engine, cfg *common.Config) {
-	if cfg.Ring.JinglePath != nil {
-		e.GET(cfg.Ring.JingleName, func(c *gin.Context) {
-			c.File(path.Join(*cfg.Ring.JinglePath, cfg.Ring.JingleName))
-		})
-	}
-
 	if cfg.Http.StaticPath != nil {
 		handler := common.NewStaticHandler(staticDiskSource{*cfg.Http.StaticPath}, "index.html")
 		e.NoRoute(func(c *gin.Context) {

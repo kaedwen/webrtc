@@ -3,6 +3,7 @@ build:
 
 build-static:
 	npm --prefix static ci && npm --prefix static run build
+	cp -r audio static/dist/audio
 
 build-armhf:
 	GOARCH=arm \

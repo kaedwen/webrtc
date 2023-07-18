@@ -43,6 +43,7 @@ type sonosInfo struct {
 type sonosAudioClip struct {
 	Name      string `json:"name"`
 	AppId     string `json:"appId"`
+	ClipType  string `json:"clipType,omitempty"`
 	StreamUrl string `json:"streamUrl"`
 	Volume    int    `json:"volume"`
 }
@@ -108,6 +109,7 @@ func (p *SonosPlayer) Play(uri *url.URL, volume int) error {
 	sab := sonosAudioClip{
 		Name:      "Pull Bell",
 		AppId:     "com.acme.app",
+		ClipType:  "CHIME",
 		StreamUrl: uri.String(),
 		Volume:    volume,
 	}
@@ -181,6 +183,7 @@ func (h *SonosHandler) Watch(ctx context.Context) error {
 
 func (h *SonosHandler) Play(uri *url.URL) error {
 	for _, p := range h.players {
+		h.lg.Info("playing clip", zap.String("target", p.address.String()), zap.String("clip", uri.String()))
 		if err := p.Play(uri, h.cfg.SonosVolume); err != nil {
 			h.lg.Error("failed to play", zap.String("address", p.address.String()), zap.Error(err))
 		}

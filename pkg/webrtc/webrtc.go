@@ -2,6 +2,8 @@ package webrtc
 
 import (
 	"context"
+	"errors"
+	"io"
 	"sync"
 	"time"
 
@@ -121,6 +123,7 @@ func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.Con
 			Channels: cfg.Channels,
 			Rate:     48000,
 		},
+		Queue: cfg.USE_QUEUE,
 	}
 
 	var err error
@@ -164,6 +167,7 @@ func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.Con
 			Width:  cfg.Width,
 			Height: cfg.Height,
 		},
+		Queue: cfg.USE_QUEUE,
 	}
 
 	var err error
@@ -195,7 +199,7 @@ func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.Con
 	return nil
 }
 
-func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.SignalingHandle) error {
+func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.SignalingHandle) error {
 	wh.mu.Lock()
 	defer wh.mu.Unlock()
 
@@ -209,6 +213,9 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 	if err != nil {
 		return err
 	}
+
+	// create a context for this handle
+	hctx, hcancel := context.WithCancel(rctx)
 
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
 	// for the given codec
@@ -227,9 +234,13 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 				select {
 				case <-ticker.C:
 					if err := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); err != nil {
+						if errors.Is(err, io.ErrClosedPipe) {
+							return
+						}
+
 						wh.lg.Error("failed to send PLI", zap.Error(err))
 					}
-				case <-ctx.Done():
+				case <-hctx.Done():
 					return
 				}
 			}
@@ -240,18 +251,24 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 		})
 		if err != nil {
 			wh.lg.Error("failed to create src pipeline", zap.Error(err))
+			return
 		}
 
 		pipeline.Start()
 		buf := make([]byte, 1400)
 		for {
-			i, _, readErr := track.Read(buf)
+			n, _, readErr := track.Read(buf)
 			if readErr != nil {
+				if errors.Is(readErr, io.EOF) {
+					return
+				}
+
 				wh.lg.Error("read failed", zap.Error(err))
+				continue
 			}
 
-			if i > 0 {
-				pipeline.Push(buf[:i])
+			if n > 0 {
+				err := pipeline.Push(buf[:n])
 				if err != nil {
 					wh.lg.Error("push failed", zap.Error(err))
 				}
@@ -266,10 +283,17 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 
 		if connectionState == webrtc.ICEConnectionStateDisconnected {
 			peerConnection.Close()
+			hcancel()
 
 			// remove this handle
 			wh.mu.Lock()
+
 			delete(wh.peerHandles, sh.Id)
+
+			if len(wh.peerHandles) == 0 {
+				wh.stopPipelines()
+			}
+
 			wh.mu.Unlock()
 		}
 	})
@@ -354,7 +378,7 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 				if err != nil {
 					wh.lg.Error("failed to handle offer", zap.Error(err))
 				}
-			case <-ctx.Done():
+			case <-hctx.Done():
 				return
 			}
 		}
