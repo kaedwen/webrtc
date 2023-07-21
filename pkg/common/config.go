@@ -47,21 +47,21 @@ type ConfigHTTP struct {
 }
 
 type ConfigVideoOutputStream struct {
-	Source    string `arg:"--video-out-src,env:VIDEO_OUT_SRC" default:"v4l2src"`
-	Device    string `arg:"--video-out-device,env:VIDEO_OUT_DEVICE" default:"/dev/video0"`
-	Codec     string `arg:"--video-out-codec,env:VIDEO_OUT_CODEC" default:"vp8"`
-	Height    uint   `arg:"--video-out-height,env:VIDEO_OUT_HEIGHT" default:"480"`
-	Width     uint   `arg:"--video-out-width,env:VIDEO_OUT_WIDTH" default:"640"`
-	USE_QUEUE bool   `arg:"--video-out-queue,env:VIDEO_OUT_QUEUE" default:"false"`
+	Source    string      `arg:"--video-out-src,env:VIDEO_OUT_SRC" default:"v4l2src"`
+	Device    string      `arg:"--video-out-device,env:VIDEO_OUT_DEVICE" default:"/dev/video0"`
+	Codec     StreamCodec `arg:"--video-out-codec,env:VIDEO_OUT_CODEC" default:"vp8"`
+	Height    uint        `arg:"--video-out-height,env:VIDEO_OUT_HEIGHT" default:"480"`
+	Width     uint        `arg:"--video-out-width,env:VIDEO_OUT_WIDTH" default:"640"`
+	USE_QUEUE bool        `arg:"--video-out-queue,env:VIDEO_OUT_QUEUE" default:"false"`
 }
 
 type ConfigAudioOutputStream struct {
-	Source     string  `arg:"--audio-out-src,env:AUDIO_OUT_SRC" default:"alsasrc"`
-	DeviceName string  `arg:"--audio-out-device-name,env:AUDIO_OUT_DEVICE" default:"default"`
-	Device     *string `arg:"--audio-out-device,env:AUDIO_OUT_DEVICE"`
-	Codec      string  `arg:"--audio-out-codec,env:AUDIO_OUT_CODEC" default:"opus"`
-	Channels   uint    `arg:"--audio-out-channels,env:AUDIO_OUT_CHANNELS" default:"1"`
-	USE_QUEUE  bool    `arg:"--audio-out-queue,env:AUDIO_OUT_QUEUE" default:"false"`
+	Source     string      `arg:"--audio-out-src,env:AUDIO_OUT_SRC" default:"alsasrc"`
+	DeviceName string      `arg:"--audio-out-device-name,env:AUDIO_OUT_DEVICE" default:"default"`
+	Device     *string     `arg:"--audio-out-device,env:AUDIO_OUT_DEVICE"`
+	Codec      StreamCodec `arg:"--audio-out-codec,env:AUDIO_OUT_CODEC" default:"opus"`
+	Channels   uint        `arg:"--audio-out-channels,env:AUDIO_OUT_CHANNELS" default:"1"`
+	USE_QUEUE  bool        `arg:"--audio-out-queue,env:AUDIO_OUT_QUEUE" default:"false"`
 }
 
 type ConfigAudioInputStream struct {

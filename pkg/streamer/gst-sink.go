@@ -1,6 +1,9 @@
 package streamer
 
 import (
+	"fmt"
+
+	"github.com/kaedwen/webrtc/pkg/common"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/tinyzimmer/go-gst/gst"
 	"github.com/tinyzimmer/go-gst/gst/app"
@@ -80,18 +83,35 @@ func CreateVideoPipelineSink(s StreamElement) (*gst.Pipeline, <-chan media.Sampl
 		elems = append(elems, queue)
 	}
 
-	// Create the enc
-	enc, err := gst.NewElement("vp8enc")
-	if err != nil {
-		return nil, nil, err
-	}
-	elems = append(elems, enc)
+	switch s.Codec {
+	case common.VP8:
+		// Create the enc
+		enc, err := gst.NewElement("vp8enc")
+		if err != nil {
+			return nil, nil, err
+		}
+		elems = append(elems, enc)
 
-	enc.SetProperty("error-resilient", "partitions")
-	enc.SetProperty("keyframe-max-dist", 10)
-	enc.SetProperty("auto-alt-ref", true)
-	enc.SetProperty("cpu-used", 5)
-	enc.SetProperty("deadline", 1)
+		enc.SetProperty("error-resilient", "partitions")
+		enc.SetProperty("keyframe-max-dist", 10)
+		enc.SetProperty("auto-alt-ref", true)
+		enc.SetProperty("cpu-used", 5)
+		enc.SetProperty("deadline", 1)
+	case common.H264:
+		// Create the enc
+		enc, err := gst.NewElement("x264enc")
+		if err != nil {
+			return nil, nil, err
+		}
+		elems = append(elems, enc)
+
+		enc.SetProperty("speed-preset", "ultrafast")
+		enc.SetProperty("tune", "zerolatency")
+		enc.SetProperty("key-int-max", 2)
+		enc.SetProperty("bitrate", 300)
+	default:
+		return nil, nil, fmt.Errorf("unsupported video codec given - %s", s.Codec)
+	}
 
 	// Create the sink
 	appsink, err := app.NewAppSink()
@@ -158,12 +178,17 @@ func CreateAudioPipelineSink(s StreamElement) (*gst.Pipeline, <-chan media.Sampl
 		elems = append(elems, queue)
 	}
 
-	// Create the enc
-	enc, err := gst.NewElement("opusenc")
-	if err != nil {
-		return nil, nil, err
+	switch s.Codec {
+	case common.OPUS:
+		// Create the enc
+		enc, err := gst.NewElement("opusenc")
+		if err != nil {
+			return nil, nil, err
+		}
+		elems = append(elems, enc)
+	default:
+		return nil, nil, fmt.Errorf("unsupported audio codec given - %s", s.Codec)
 	}
-	elems = append(elems, enc)
 
 	// Create the sink
 	appsink, err := app.NewAppSink()

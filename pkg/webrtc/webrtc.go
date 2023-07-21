@@ -22,6 +22,7 @@ const STUN_SERVER = "stun:stun.l.google.com:19302"
 type WebrtcHandler struct {
 	lg            *zap.Logger
 	mu            *sync.Mutex
+	cfg           *common.ConfigStream
 	audioPipeline *gst.Pipeline
 	videoPipeline *gst.Pipeline
 	peerHandles   map[string]*PeerHandle
@@ -35,6 +36,7 @@ type PeerHandle struct {
 func NewWebrtcHandler(ctx context.Context, lg *zap.Logger, cfg *common.ConfigStream, ch <-chan *server.SignalingHandle) error {
 	wh := WebrtcHandler{
 		lg:          lg,
+		cfg:         cfg,
 		mu:          &sync.Mutex{},
 		peerHandles: make(map[string]*PeerHandle, 0),
 	}
@@ -124,6 +126,7 @@ func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.Con
 			Rate:     48000,
 		},
 		Queue: cfg.USE_QUEUE,
+		Codec: cfg.Codec,
 	}
 
 	var err error
@@ -168,6 +171,7 @@ func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.Con
 			Height: cfg.Height,
 		},
 		Queue: cfg.USE_QUEUE,
+		Codec: cfg.Codec,
 	}
 
 	var err error
@@ -299,7 +303,7 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 	})
 
 	// Create a audio track
-	audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: "audio/opus"}, "audio", "pion1")
+	audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: wh.cfg.AudioOut.Codec.Mime()}, "audio", "pion1")
 	if err != nil {
 		return err
 	}
@@ -309,7 +313,7 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 	}
 
 	// Create a video track
-	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion2")
+	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: wh.cfg.VideoOut.Codec.Mime()}, "video", "pion2")
 	if err != nil {
 		return err
 	}
