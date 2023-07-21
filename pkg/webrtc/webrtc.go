@@ -93,12 +93,12 @@ func (wh *WebrtcHandler) startPipelines() {
 func (wh *WebrtcHandler) stopPipelines() {
 	var err error
 
-	err = wh.audioPipeline.SetState(gst.StatePaused)
+	err = wh.audioPipeline.SetState(gst.StateNull)
 	if err != nil {
 		wh.lg.Fatal("failed to pause audio pipeline", zap.Error(err))
 	}
 
-	err = wh.videoPipeline.SetState(gst.StatePaused)
+	err = wh.videoPipeline.SetState(gst.StateNull)
 	if err != nil {
 		wh.lg.Fatal("failed to pause video pipeline", zap.Error(err))
 	}
