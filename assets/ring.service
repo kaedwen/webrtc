@@ -1,0 +1,9 @@
+[Unit]
+Description=WebRTC Ring Service
+
+[Service]
+ExecStart=/usr/local/bin/ring
+EnvironmentFile=-/etc/ring/ring.conf
+
+[Install]
+WantedBy=multi-user.target

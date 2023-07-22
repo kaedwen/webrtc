@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kaedwen/webrtc/pkg/common"
 	"github.com/tinyzimmer/go-gst/gst"
 	"github.com/tinyzimmer/go-gst/gst/app"
 	"go.uber.org/zap"
@@ -28,8 +29,10 @@ type StreamElementCaps struct {
 
 type StreamElement struct {
 	Kind       string
+	Codec      common.StreamCodec
 	Properties map[string]interface{}
 	Caps       *StreamElementCaps
+	Queue      bool
 }
 
 func (se StreamElement) ToGstCaps() *gst.Caps {

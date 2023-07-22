@@ -2,6 +2,8 @@ package webrtc
 
 import (
 	"context"
+	"errors"
+	"io"
 	"sync"
 	"time"
 
@@ -20,6 +22,7 @@ const STUN_SERVER = "stun:stun.l.google.com:19302"
 type WebrtcHandler struct {
 	lg            *zap.Logger
 	mu            *sync.Mutex
+	cfg           *common.ConfigStream
 	audioPipeline *gst.Pipeline
 	videoPipeline *gst.Pipeline
 	peerHandles   map[string]*PeerHandle
@@ -33,6 +36,7 @@ type PeerHandle struct {
 func NewWebrtcHandler(ctx context.Context, lg *zap.Logger, cfg *common.ConfigStream, ch <-chan *server.SignalingHandle) error {
 	wh := WebrtcHandler{
 		lg:          lg,
+		cfg:         cfg,
 		mu:          &sync.Mutex{},
 		peerHandles: make(map[string]*PeerHandle, 0),
 	}
@@ -91,12 +95,12 @@ func (wh *WebrtcHandler) startPipelines() {
 func (wh *WebrtcHandler) stopPipelines() {
 	var err error
 
-	err = wh.audioPipeline.SetState(gst.StatePaused)
+	err = wh.audioPipeline.SetState(gst.StateNull)
 	if err != nil {
 		wh.lg.Fatal("failed to pause audio pipeline", zap.Error(err))
 	}
 
-	err = wh.videoPipeline.SetState(gst.StatePaused)
+	err = wh.videoPipeline.SetState(gst.StateNull)
 	if err != nil {
 		wh.lg.Fatal("failed to pause video pipeline", zap.Error(err))
 	}
@@ -121,6 +125,8 @@ func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.Con
 			Channels: cfg.Channels,
 			Rate:     48000,
 		},
+		Queue: cfg.USE_QUEUE,
+		Codec: cfg.Codec,
 	}
 
 	var err error
@@ -164,6 +170,8 @@ func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.Con
 			Width:  cfg.Width,
 			Height: cfg.Height,
 		},
+		Queue: cfg.USE_QUEUE,
+		Codec: cfg.Codec,
 	}
 
 	var err error
@@ -195,7 +203,7 @@ func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.Con
 	return nil
 }
 
-func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.SignalingHandle) error {
+func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.SignalingHandle) error {
 	wh.mu.Lock()
 	defer wh.mu.Unlock()
 
@@ -209,6 +217,9 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 	if err != nil {
 		return err
 	}
+
+	// create a context for this handle
+	hctx, hcancel := context.WithCancel(rctx)
 
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
 	// for the given codec
@@ -227,9 +238,13 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 				select {
 				case <-ticker.C:
 					if err := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); err != nil {
+						if errors.Is(err, io.ErrClosedPipe) {
+							return
+						}
+
 						wh.lg.Error("failed to send PLI", zap.Error(err))
 					}
-				case <-ctx.Done():
+				case <-hctx.Done():
 					return
 				}
 			}
@@ -240,18 +255,24 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 		})
 		if err != nil {
 			wh.lg.Error("failed to create src pipeline", zap.Error(err))
+			return
 		}
 
 		pipeline.Start()
 		buf := make([]byte, 1400)
 		for {
-			i, _, readErr := track.Read(buf)
+			n, _, readErr := track.Read(buf)
 			if readErr != nil {
+				if errors.Is(readErr, io.EOF) {
+					return
+				}
+
 				wh.lg.Error("read failed", zap.Error(err))
+				continue
 			}
 
-			if i > 0 {
-				pipeline.Push(buf[:i])
+			if n > 0 {
+				err := pipeline.Push(buf[:n])
 				if err != nil {
 					wh.lg.Error("push failed", zap.Error(err))
 				}
@@ -266,16 +287,23 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 
 		if connectionState == webrtc.ICEConnectionStateDisconnected {
 			peerConnection.Close()
+			hcancel()
 
 			// remove this handle
 			wh.mu.Lock()
+
 			delete(wh.peerHandles, sh.Id)
+
+			if len(wh.peerHandles) == 0 {
+				wh.stopPipelines()
+			}
+
 			wh.mu.Unlock()
 		}
 	})
 
 	// Create a audio track
-	audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: "audio/opus"}, "audio", "pion1")
+	audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: wh.cfg.AudioOut.Codec.Mime()}, "audio", "pion1")
 	if err != nil {
 		return err
 	}
@@ -285,7 +313,7 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 	}
 
 	// Create a video track
-	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion2")
+	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: wh.cfg.VideoOut.Codec.Mime()}, "video", "pion2")
 	if err != nil {
 		return err
 	}
@@ -354,7 +382,7 @@ func (wh *WebrtcHandler) createPeerHandle(ctx context.Context, sh *server.Signal
 				if err != nil {
 					wh.lg.Error("failed to handle offer", zap.Error(err))
 				}
-			case <-ctx.Done():
+			case <-hctx.Done():
 				return
 			}
 		}

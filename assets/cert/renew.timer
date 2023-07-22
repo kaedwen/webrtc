@@ -1,0 +1,10 @@
+[Unit]
+Description=Renew certificate
+
+[Timer]
+Persistent=true
+OnCalendar=*-*-* 3:35
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target

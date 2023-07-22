@@ -7,3 +7,7 @@ func Time[T any](runnable func() (T, error)) (time.Duration, T, error) {
 	res, err := runnable()
 	return time.Since(t), res, err
 }
+
+func Ptr[T any](v T) *T {
+	return &v
+}

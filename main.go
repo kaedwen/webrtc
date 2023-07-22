@@ -6,6 +6,7 @@ import (
 	"syscall"
 
 	"github.com/kaedwen/webrtc/pkg/common"
+	"github.com/kaedwen/webrtc/pkg/ring"
 	"github.com/kaedwen/webrtc/pkg/server"
 	"github.com/kaedwen/webrtc/pkg/webrtc"
 	"github.com/tinyzimmer/go-glib/glib"
@@ -26,7 +27,17 @@ func main() {
 		panic(err)
 	}
 
-	http := server.NewHttpServer(lg.With(zap.String("context", "server")), &cfg.Http)
+	http := server.NewHttpServer(lg.With(zap.String("context", "server")), &cfg)
+
+	rh, err := ring.NewRingHandler(lg.With(zap.String("context", "ring")), &cfg.Ring)
+	if err != nil {
+		panic(err)
+	}
+
+	err = rh.Watch(ctx)
+	if err != nil {
+		panic(err)
+	}
 
 	err = webrtc.NewWebrtcHandler(ctx, lg.With(zap.String("context", "webrtc")), cfg.Stream(), http.Hndl)
 	if err != nil {

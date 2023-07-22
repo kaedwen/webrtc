@@ -25,7 +25,7 @@ type SignalingHandle struct {
 type HttpServer struct {
 	http.Server
 	lg   *zap.Logger
-	cfg  *common.ConfigHTTP
+	cfg  *common.Config
 	Hndl chan *SignalingHandle
 }
 
@@ -37,7 +37,7 @@ func NewSignalingHandle(id string) SignalingHandle {
 	}
 }
 
-func NewHttpServer(lg *zap.Logger, cfg *common.ConfigHTTP) *HttpServer {
+func NewHttpServer(lg *zap.Logger, cfg *common.Config) *HttpServer {
 	h := HttpServer{
 		Hndl: make(chan *SignalingHandle, 10),
 		cfg:  cfg,
@@ -57,12 +57,12 @@ func NewHttpServer(lg *zap.Logger, cfg *common.ConfigHTTP) *HttpServer {
 }
 
 func (h *HttpServer) ListenAndServe(ctx context.Context) error {
-	if h.cfg.Tls {
+	if h.cfg.Http.Tls {
 		// set the configured address
-		h.Addr = h.cfg.Address()
+		h.Addr = h.cfg.Http.Address()
 
-		if h.cfg.TlsCert != nil && h.cfg.TlsKey != nil {
-			cert, err := tls.LoadX509KeyPair(*h.cfg.TlsCert, *h.cfg.TlsKey)
+		if h.cfg.Http.TlsCert != nil && h.cfg.Http.TlsKey != nil {
+			cert, err := tls.LoadX509KeyPair(*h.cfg.Http.TlsCert, *h.cfg.Http.TlsKey)
 			if err != nil {
 				return err
 			}
@@ -94,7 +94,7 @@ func (h *HttpServer) ListenAndServe(ctx context.Context) error {
 		}()
 	} else {
 		// set the configured address
-		h.Addr = h.cfg.Address()
+		h.Addr = h.cfg.Http.Address()
 
 		go func() {
 			// and listen
