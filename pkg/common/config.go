@@ -27,12 +27,13 @@ type ConfigLogging struct {
 }
 
 type ConfigRing struct {
-	Device        *string `arg:"--input-device,env:INPUT_DEVICE"`
-	Key           string  `arg:"--ring-key" default:"KEY_F1"`
-	JingleBaseUri *string `arg:"--jingle-base-uri,env:JINGLE_BASE_URI"`
-	JinglePath    string  `arg:"--jingle-path,env:JINGLE_PATH" default:"audio/ding-dong.wav"`
-	SonosTarget   string  `arg:"--sonos-target,env:SONOS_TARGET" default:"-"`
-	SonosVolume   int     `arg:"--sonos-volume,env:SONOS_VOLUME" default:"50"`
+	Device               *string `arg:"--input-device,env:INPUT_DEVICE"`
+	Key                  string  `arg:"--ring-key" default:"KEY_F1"`
+	JingleBaseUri        *string `arg:"--jingle-base-uri,env:JINGLE_BASE_URI"`
+	JinglePath           string  `arg:"--jingle-path,env:JINGLE_PATH" default:"audio/ding-dong.wav"`
+	SonosTarget          string  `arg:"--sonos-target,env:SONOS_TARGET" default:"-"`
+	SonosVolume          int     `arg:"--sonos-volume,env:SONOS_VOLUME" default:"50"`
+	HomeassistantWebhook *string `arg:"--ha-webhook,env:HA_WEBHOOK"`
 }
 
 type ConfigHTTP struct {

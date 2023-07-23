@@ -3,7 +3,9 @@ package ring
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/holoplot/go-evdev"
 	"github.com/kaedwen/webrtc/pkg/common"
@@ -72,11 +74,25 @@ func (h *RingHandler) Watch(ctx context.Context) error {
 		for {
 			e, err := d.ReadOne()
 			if err == nil && e.Code == key && e.Value == 0 {
+				// run all players
 				tu := bu.JoinPath(h.cfg.JinglePath)
 				for _, p := range h.playHandlers {
 					if err := p.Play(tu); err != nil {
 						h.lg.Error("failed to play", zap.Error(err))
 					}
+				}
+
+				// run webhooks when configured
+				if h.cfg.HomeassistantWebhook != nil {
+					h.lg.Info("Triggering Homeassistant Webhook", zap.String("hook", *h.cfg.HomeassistantWebhook))
+					ctxt, cancel := context.WithTimeout(ctx, 30*time.Second)
+
+					err := h.TriggerWebhook(ctxt, *h.cfg.HomeassistantWebhook)
+					if err != nil {
+						h.lg.Error("failed to trigger webhook", zap.Error(err))
+					}
+
+					cancel()
 				}
 			}
 		}
@@ -86,6 +102,24 @@ func (h *RingHandler) Watch(ctx context.Context) error {
 		<-ctx.Done()
 		_ = d.Close()
 	}()
+
+	return nil
+}
+
+func (h *RingHandler) TriggerWebhook(ctx context.Context, hook string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, *h.cfg.HomeassistantWebhook, nil)
+	if err != nil {
+		return err
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode != 200 {
+		return fmt.Errorf("received wrong status code - %d", res.StatusCode)
+	}
 
 	return nil
 }
