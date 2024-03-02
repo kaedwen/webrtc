@@ -75,7 +75,7 @@ jobs:
           echo "PKG_CONFIG_PATH=/usr/lib/${{ matrix.target.prefix }}/pkgconfig" >> $GITHUB_ENV
           echo "CC=${PREFIX:+$PREFIX-}gcc" >> $GITHUB_ENV
       - run: make build
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: service-${{ matrix.target.os }}-${{ matrix.target.goarch }}
           path: service
