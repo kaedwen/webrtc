@@ -59,7 +59,7 @@ type ConfigVideoSourceStream struct {
 
 type ConfigAudioSourceStream struct {
 	Source     string      `arg:"--audio-src,env:AUDIO_SRC" default:"alsasrc"`
-	DeviceName string      `arg:"--audio-device-name,env:AUDIO_SRC_DEVICE" default:"default"`
+	DeviceName string      `arg:"--audio-device-name,env:AUDIO_SRC_DEVICE_NAME" default:"default"`
 	Device     *string     `arg:"--audio-device,env:AUDIO_SRC_DEVICE"`
 	Codec      StreamCodec `arg:"--audio-codec,env:AUDIO_SRC_CODEC" default:"opus"`
 	Channels   uint        `arg:"--audio-channels,env:AUDIO_SRC_CHANNELS" default:"1"`

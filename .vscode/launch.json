@@ -13,7 +13,8 @@
       "env": {
         "HTTP_STATIC": "${workspaceFolder}/static/dist",
         "VIDEO_SRC_DEVICE": "/dev/video4",
-        "AUDIO_SRC_DEVICE": "plughw:0,1,1",
+        //"AUDIO_SRC_DEVICE": "plughw:4,0,0",
+        "AUDIO_SRC": "pulsesrc",
         "INPUT_DEVICE": "/dev/input/event5",
         "JINGLE_PATH": "${workspaceFolder}/audio",
         "SONOS_TARGET": "Living Room",
