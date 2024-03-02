@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
+	"github.com/go-gst/go-gst/gst"
+	"github.com/go-gst/go-gst/gst/app"
 	"github.com/kaedwen/webrtc/pkg/common"
-	"github.com/tinyzimmer/go-gst/gst"
-	"github.com/tinyzimmer/go-gst/gst/app"
 	"go.uber.org/zap"
 )
 
@@ -79,7 +78,7 @@ func LoopBus(lg *zap.Logger, pipeline *gst.Pipeline) {
 	// Loop over messsages from the pipeline
 	go func() {
 		for {
-			msg := bus.TimedPop(time.Duration(-1))
+			msg := bus.TimedPop(gst.ClockTimeNone)
 			if msg == nil {
 				return
 			}

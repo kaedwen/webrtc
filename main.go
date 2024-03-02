@@ -5,11 +5,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/go-gst/go-glib/glib"
 	"github.com/kaedwen/webrtc/pkg/common"
 	"github.com/kaedwen/webrtc/pkg/ring"
 	"github.com/kaedwen/webrtc/pkg/server"
 	"github.com/kaedwen/webrtc/pkg/webrtc"
-	"github.com/tinyzimmer/go-glib/glib"
 	"go.uber.org/zap"
 )
 

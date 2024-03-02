@@ -177,8 +177,15 @@ func (h *SonosHandler) Watch(ctx context.Context) error {
 		}
 	}()
 
+	params := mdns.DefaultParams("_sonos._tcp")
+	params.Entries = entriesCh
+
+	if h.cfg.NoIPv6 {
+		params.DisableIPv6 = true
+	}
+
 	// Start the lookup
-	return mdns.Lookup("_sonos._tcp", entriesCh)
+	return mdns.Query(params)
 }
 
 func (h *SonosHandler) Play(uri *url.URL) error {

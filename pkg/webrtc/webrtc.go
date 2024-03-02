@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-gst/go-gst/gst"
 	"github.com/kaedwen/webrtc/pkg/common"
 	"github.com/kaedwen/webrtc/pkg/server"
 	"github.com/kaedwen/webrtc/pkg/streamer"
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
-	"github.com/tinyzimmer/go-gst/gst"
 	"go.uber.org/zap"
 )
 
@@ -41,12 +41,12 @@ func NewWebrtcHandler(ctx context.Context, lg *zap.Logger, cfg *common.ConfigStr
 		peerHandles: make(map[string]*PeerHandle, 0),
 	}
 
-	err := wh.handleAudioSamples(ctx, &cfg.AudioOut)
+	err := wh.handleAudioSamples(ctx, &cfg.AudioSrc)
 	if err != nil {
 		return err
 	}
 
-	err = wh.handleVideoSamples(ctx, &cfg.VideoOut)
+	err = wh.handleVideoSamples(ctx, &cfg.VideoSrc)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func NewWebrtcHandler(ctx context.Context, lg *zap.Logger, cfg *common.ConfigStr
 
 func (wh *WebrtcHandler) startPipelines() {
 
-	if wh.audioPipeline.GetState() != gst.StatePlaying {
+	if wh.audioPipeline.GetCurrentState() != gst.StatePlaying {
 		err := wh.audioPipeline.SetState(gst.StatePlaying)
 		if err != nil {
 			wh.lg.Fatal("failed to start audio pipeline", zap.Error(err))
@@ -82,7 +82,7 @@ func (wh *WebrtcHandler) startPipelines() {
 		wh.lg.Info("started audio pipeline")
 	}
 
-	if wh.videoPipeline.GetState() != gst.StatePlaying {
+	if wh.videoPipeline.GetCurrentState() != gst.StatePlaying {
 		err := wh.videoPipeline.SetState(gst.StatePlaying)
 		if err != nil {
 			wh.lg.Fatal("failed to start video pipeline", zap.Error(err))
@@ -107,7 +107,7 @@ func (wh *WebrtcHandler) stopPipelines() {
 
 }
 
-func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.ConfigAudioOutputStream) error {
+func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.ConfigAudioSourceStream) error {
 	properties := map[string]interface{}{}
 	if cfg.Source == "alsasrc" {
 		if cfg.Device != nil {
@@ -158,7 +158,7 @@ func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.Con
 	return nil
 }
 
-func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.ConfigVideoOutputStream) error {
+func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.ConfigVideoSourceStream) error {
 	src := streamer.StreamElement{
 		Kind: cfg.Source,
 		Properties: map[string]interface{}{
@@ -234,6 +234,8 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
 		go func() {
 			ticker := time.NewTicker(time.Second * 3)
+			defer ticker.Stop()
+
 			for {
 				select {
 				case <-ticker.C:
@@ -258,7 +260,12 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 			return
 		}
 
-		pipeline.Start()
+		err = pipeline.Start()
+		if err != nil {
+			wh.lg.Error("failed to start pipeline", zap.Error(err))
+			return
+		}
+
 		buf := make([]byte, 1400)
 		for {
 			n, _, readErr := track.Read(buf)
@@ -303,7 +310,7 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 	})
 
 	// Create a audio track
-	audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: wh.cfg.AudioOut.Codec.Mime()}, "audio", "pion1")
+	audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: wh.cfg.AudioSrc.Codec.Mime()}, "audio", "pion1")
 	if err != nil {
 		return err
 	}
@@ -313,7 +320,7 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 	}
 
 	// Create a video track
-	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: wh.cfg.VideoOut.Codec.Mime()}, "video", "pion2")
+	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: wh.cfg.VideoSrc.Codec.Mime()}, "video", "pion2")
 	if err != nil {
 		return err
 	}

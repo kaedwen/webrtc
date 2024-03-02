@@ -8,18 +8,18 @@ import (
 )
 
 type Config struct {
-	VideoOut ConfigVideoOutputStream `arg:"group:VideoOut"`
-	AudioOut ConfigAudioOutputStream `arg:"group:AudioOut"`
-	AudioIn  ConfigAudioInputStream  `arg:"group:AudioIn"`
-	Logging  ConfigLogging           `arg:"group:Logging"`
-	Ring     ConfigRing              `arg:"group:Ring"`
-	Http     ConfigHTTP              `arg:"group:Http"`
+	VideoSrc  ConfigVideoSourceStream
+	AudioSrc  ConfigAudioSourceStream
+	AudioSink ConfigAudioSinkStream
+	Logging   ConfigLogging
+	Ring      ConfigRing
+	Http      ConfigHTTP
 }
 
 type ConfigStream struct {
-	VideoOut ConfigVideoOutputStream
-	AudioOut ConfigAudioOutputStream
-	AudioIn  ConfigAudioInputStream
+	VideoSrc  ConfigVideoSourceStream // video src for webrtc send
+	AudioSrc  ConfigAudioSourceStream // audio src for webrtc send
+	AudioSink ConfigAudioSinkStream   // audio sink for webrtc receive
 }
 
 type ConfigLogging struct {
@@ -34,6 +34,7 @@ type ConfigRing struct {
 	SonosTarget          string  `arg:"--sonos-target,env:SONOS_TARGET" default:"-"`
 	SonosVolume          int     `arg:"--sonos-volume,env:SONOS_VOLUME" default:"50"`
 	HomeassistantWebhook *string `arg:"--ha-webhook,env:HA_WEBHOOK"`
+	NoIPv6               bool    `arg:"--disable-ipv6,env:NO_IPV6" default:"false"`
 }
 
 type ConfigHTTP struct {
@@ -47,37 +48,37 @@ type ConfigHTTP struct {
 	StaticPath       *string `arg:"--http-static,env:HTTP_STATIC"`
 }
 
-type ConfigVideoOutputStream struct {
-	Source    string      `arg:"--video-out-src,env:VIDEO_OUT_SRC" default:"v4l2src"`
-	Device    string      `arg:"--video-out-device,env:VIDEO_OUT_DEVICE" default:"/dev/video0"`
-	Codec     StreamCodec `arg:"--video-out-codec,env:VIDEO_OUT_CODEC" default:"vp8"`
-	Height    uint        `arg:"--video-out-height,env:VIDEO_OUT_HEIGHT" default:"480"`
-	Width     uint        `arg:"--video-out-width,env:VIDEO_OUT_WIDTH" default:"640"`
-	USE_QUEUE bool        `arg:"--video-out-queue,env:VIDEO_OUT_QUEUE" default:"false"`
+type ConfigVideoSourceStream struct {
+	Source    string      `arg:"--video-src,env:VIDEO_SRC" default:"v4l2src"`
+	Device    string      `arg:"--video-device,env:VIDEO_SRC_DEVICE" default:"/dev/video0"`
+	Codec     StreamCodec `arg:"--video-codec,env:VIDEO_SRC_CODEC" default:"vp8"`
+	Height    uint        `arg:"--video-height,env:VIDEO_SRC_HEIGHT" default:"480"`
+	Width     uint        `arg:"--video-width,env:VIDEO_SRC_WIDTH" default:"640"`
+	USE_QUEUE bool        `arg:"--video-queue,env:VIDEO_SRC_QUEUE" default:"false"`
 }
 
-type ConfigAudioOutputStream struct {
-	Source     string      `arg:"--audio-out-src,env:AUDIO_OUT_SRC" default:"alsasrc"`
-	DeviceName string      `arg:"--audio-out-device-name,env:AUDIO_OUT_DEVICE" default:"default"`
-	Device     *string     `arg:"--audio-out-device,env:AUDIO_OUT_DEVICE"`
-	Codec      StreamCodec `arg:"--audio-out-codec,env:AUDIO_OUT_CODEC" default:"opus"`
-	Channels   uint        `arg:"--audio-out-channels,env:AUDIO_OUT_CHANNELS" default:"1"`
-	USE_QUEUE  bool        `arg:"--audio-out-queue,env:AUDIO_OUT_QUEUE" default:"false"`
+type ConfigAudioSourceStream struct {
+	Source     string      `arg:"--audio-src,env:AUDIO_SRC" default:"alsasrc"`
+	DeviceName string      `arg:"--audio-device-name,env:AUDIO_SRC_DEVICE" default:"default"`
+	Device     *string     `arg:"--audio-device,env:AUDIO_SRC_DEVICE"`
+	Codec      StreamCodec `arg:"--audio-codec,env:AUDIO_SRC_CODEC" default:"opus"`
+	Channels   uint        `arg:"--audio-channels,env:AUDIO_SRC_CHANNELS" default:"1"`
+	USE_QUEUE  bool        `arg:"--audio-queue,env:AUDIO_SRC_QUEUE" default:"false"`
 }
 
-type ConfigAudioInputStream struct {
-	Sink       string  `arg:"--audio-in-src,env:AUDIO_IN_SINK" default:"alsasink"`
-	DeviceName string  `arg:"--audio-in-device-name,env:AUDIO_IN_DEVICE" default:"default"`
-	Device     *string `arg:"--audio-in-device,env:AUDIO_IN_DEVICE"`
-	Codec      string  `arg:"--audio-in-codec,env:AUDIO_IN_CODEC" default:"opus"`
-	Channels   uint    `arg:"--audio-in-channels,env:AUDIO_IN_CHANNELS" default:"1"`
+type ConfigAudioSinkStream struct {
+	Sink       string  `arg:"--audio-in-src,env:AUDIO_SINK" default:"alsasink"`
+	DeviceName string  `arg:"--audio-in-device-name,env:AUDIO_SINK_DEVICE_NAME" default:"default"`
+	Device     *string `arg:"--audio-in-device,env:AUDIO_SINK_DEVICE"`
+	Codec      string  `arg:"--audio-in-codec,env:AUDIO_SINK_CODEC" default:"opus"`
+	Channels   uint    `arg:"--audio-in-channels,env:AUDIO_SINK_CHANNELS" default:"1"`
 }
 
 func (c *Config) Stream() *ConfigStream {
 	return &ConfigStream{
-		VideoOut: c.VideoOut,
-		AudioOut: c.AudioOut,
-		AudioIn:  c.AudioIn,
+		VideoSrc:  c.VideoSrc,
+		AudioSrc:  c.AudioSrc,
+		AudioSink: c.AudioSink,
 	}
 }
 
@@ -86,5 +87,10 @@ func (c *ConfigHTTP) Address() string {
 }
 
 func (c *Config) MustParse() {
-	arg.MustParse(c)
+	arg.MustParse(&c.VideoSrc)
+	arg.MustParse(&c.AudioSrc)
+	arg.MustParse(&c.AudioSink)
+	arg.MustParse(&c.Logging)
+	arg.MustParse(&c.Http)
+	arg.MustParse(&c.Ring)
 }

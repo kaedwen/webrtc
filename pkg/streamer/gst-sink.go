@@ -3,10 +3,10 @@ package streamer
 import (
 	"fmt"
 
+	"github.com/go-gst/go-gst/gst"
+	"github.com/go-gst/go-gst/gst/app"
 	"github.com/kaedwen/webrtc/pkg/common"
 	"github.com/pion/webrtc/v3/pkg/media"
-	"github.com/tinyzimmer/go-gst/gst"
-	"github.com/tinyzimmer/go-gst/gst/app"
 )
 
 func setCallback(sink *app.Sink, ch chan media.Sample) {
@@ -30,7 +30,7 @@ func setCallback(sink *app.Sink, ch chan media.Sample) {
 			data := buffer.Map(gst.MapRead).AsUint8Slice()
 			defer buffer.Unmap()
 
-			ch <- media.Sample{Data: data, Duration: buffer.Duration()}
+			ch <- media.Sample{Data: data, Duration: *buffer.Duration().AsDuration()}
 
 			return gst.FlowOK
 		},

@@ -3,13 +3,20 @@ package streamer
 import (
 	"fmt"
 
-	"github.com/tinyzimmer/go-gst/gst"
-	"github.com/tinyzimmer/go-gst/gst/app"
+	"github.com/go-gst/go-gst/gst"
+	"github.com/go-gst/go-gst/gst/app"
 )
 
 type SrcPipeline struct {
 	*gst.Pipeline
 	src *app.Source
+}
+
+func NewSrcPipeline(p *gst.Pipeline, src *app.Source) *SrcPipeline {
+	return &SrcPipeline{
+		Pipeline: p,
+		src:      src,
+	}
 }
 
 func CreateAudioPipelineSrc(dst StreamElement) (*SrcPipeline, error) {
@@ -19,54 +26,41 @@ func CreateAudioPipelineSrc(dst StreamElement) (*SrcPipeline, error) {
 		return nil, err
 	}
 
-	elems := make([]*gst.Element, 0)
-
-	// Create the src
-	appsrc, err := app.NewAppSrc()
+	elems, err := gst.NewElementMany("appsrc", "rtpjitterbuffer", "rtpopusdepay", "opusdec", dst.Kind)
 	if err != nil {
 		return nil, err
 	}
-	elems = append(elems, appsrc.Element)
 
+	caps := gst.NewEmptySimpleCaps("application/x-rtp")
+	caps.SetValue("media", "audio")
+	caps.SetValue("clock-rate", 48000)
+	caps.SetValue("payload", 96)
+	caps.SetValue("encoding-name", "OPUS")
+
+	appsrc := app.SrcFromElement(elems[0])
 	appsrc.SetFormat(gst.FormatTime)
 	appsrc.SetDoTimestamp(true)
 	appsrc.SetLive(true)
-
-	// Create the opus decoder
-	decCodec, err := gst.NewElement("rtpopusdepay")
-	if err != nil {
-		return nil, err
-	}
-	elems = append(elems, decCodec)
-
-	// Create the bin decoder
-	decBin, err := gst.NewElement("decodebin")
-	if err != nil {
-		return nil, err
-	}
-	elems = append(elems, decBin)
+	appsrc.SetCaps(caps)
 
 	// Create the sink
-	sink, err := gst.NewElement(dst.Kind)
-	if err != nil {
-		return nil, err
-	}
-	elems = append(elems, sink)
+	sink := elems[len(elems)-1]
 
 	for name, value := range dst.Properties {
 		sink.SetProperty(name, value)
 	}
 
-	// Add the elements to the pipeline
-	pipeline.AddMany(elems...)
+	// Add the elements to the pipeline and link them
+	err = pipeline.AddMany(elems...)
+	if err != nil {
+		return nil, err
+	}
+	err = gst.ElementLinkMany(elems...)
+	if err != nil {
+		return nil, err
+	}
 
-	// link the elements
-	gst.ElementLinkMany(elems...)
-
-	return &SrcPipeline{
-		Pipeline: pipeline,
-		src:      appsrc,
-	}, nil
+	return NewSrcPipeline(pipeline, appsrc), nil
 }
 
 func (p *SrcPipeline) Push(data []byte) error {
