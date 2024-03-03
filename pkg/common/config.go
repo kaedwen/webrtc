@@ -49,29 +49,30 @@ type ConfigHTTP struct {
 }
 
 type ConfigVideoSourceStream struct {
-	Source    string      `arg:"--video-src,env:VIDEO_SRC" default:"v4l2src"`
-	Device    string      `arg:"--video-device,env:VIDEO_SRC_DEVICE" default:"/dev/video0"`
-	Codec     StreamCodec `arg:"--video-codec,env:VIDEO_SRC_CODEC" default:"vp8"`
-	Height    uint        `arg:"--video-height,env:VIDEO_SRC_HEIGHT" default:"480"`
-	Width     uint        `arg:"--video-width,env:VIDEO_SRC_WIDTH" default:"640"`
-	USE_QUEUE bool        `arg:"--video-queue,env:VIDEO_SRC_QUEUE" default:"false"`
+	Source string      `arg:"--video-src,env:VIDEO_SRC" default:"v4l2src"`
+	Device string      `arg:"--video-src-device,env:VIDEO_SRC_DEVICE" default:"/dev/video0"`
+	Codec  StreamCodec `arg:"--video-src-codec,env:VIDEO_SRC_CODEC" default:"vp8"`
+	Height uint        `arg:"--video-src-height,env:VIDEO_SRC_HEIGHT" default:"480"`
+	Width  uint        `arg:"--video-src-width,env:VIDEO_SRC_WIDTH" default:"640"`
+	Queue  bool        `arg:"--video-src-queue,env:VIDEO_SRC_QUEUE" default:"false"`
 }
 
 type ConfigAudioSourceStream struct {
 	Source     string      `arg:"--audio-src,env:AUDIO_SRC" default:"alsasrc"`
-	DeviceName string      `arg:"--audio-device-name,env:AUDIO_SRC_DEVICE_NAME" default:"default"`
-	Device     *string     `arg:"--audio-device,env:AUDIO_SRC_DEVICE"`
-	Codec      StreamCodec `arg:"--audio-codec,env:AUDIO_SRC_CODEC" default:"opus"`
-	Channels   uint        `arg:"--audio-channels,env:AUDIO_SRC_CHANNELS" default:"1"`
-	USE_QUEUE  bool        `arg:"--audio-queue,env:AUDIO_SRC_QUEUE" default:"false"`
+	DeviceName string      `arg:"--audio-src-device-name,env:AUDIO_SRC_DEVICE_NAME" default:"default"`
+	Device     *string     `arg:"--audio-src-device,env:AUDIO_SRC_DEVICE"`
+	Codec      StreamCodec `arg:"--audio-src-codec,env:AUDIO_SRC_CODEC" default:"opus"`
+	Channels   uint        `arg:"--audio-src-channels,env:AUDIO_SRC_CHANNELS" default:"1"`
+	Queue      bool        `arg:"--audio-src-queue,env:AUDIO_SRC_QUEUE" default:"false"`
 }
 
 type ConfigAudioSinkStream struct {
-	Sink       string  `arg:"--audio-in-src,env:AUDIO_SINK" default:"alsasink"`
-	DeviceName string  `arg:"--audio-in-device-name,env:AUDIO_SINK_DEVICE_NAME" default:"default"`
-	Device     *string `arg:"--audio-in-device,env:AUDIO_SINK_DEVICE"`
-	Codec      string  `arg:"--audio-in-codec,env:AUDIO_SINK_CODEC" default:"opus"`
-	Channels   uint    `arg:"--audio-in-channels,env:AUDIO_SINK_CHANNELS" default:"1"`
+	Sink       string  `arg:"--audio-sink,env:AUDIO_SINK" default:"alsasink"`
+	DeviceName string  `arg:"--audio-sink-device-name,env:AUDIO_SINK_DEVICE_NAME" default:"default"`
+	Device     *string `arg:"--audio-sink-device,env:AUDIO_SINK_DEVICE"`
+	Codec      string  `arg:"--audio-sink-codec,env:AUDIO_SINK_CODEC" default:"opus"`
+	Channels   uint    `arg:"--audio-sink-channels,env:AUDIO_SINK_CHANNELS" default:"1"`
+	Queue      bool    `arg:"--audio-sink-queue,env:AUDIO_SINK_QUEUE" default:"false"`
 }
 
 func (c *Config) Stream() *ConfigStream {

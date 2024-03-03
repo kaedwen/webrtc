@@ -15,6 +15,7 @@
         "VIDEO_SRC_DEVICE": "/dev/video4",
         //"AUDIO_SRC_DEVICE": "plughw:4,0,0",
         "AUDIO_SRC": "pulsesrc",
+        "AUDIO_SINK": "pulsesink",
         "INPUT_DEVICE": "/dev/input/event5",
         "JINGLE_PATH": "${workspaceFolder}/audio",
         "SONOS_TARGET": "Living Room",

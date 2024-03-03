@@ -109,7 +109,7 @@ func (wh *WebrtcHandler) stopPipelines() {
 
 func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.ConfigAudioSourceStream) error {
 	properties := map[string]interface{}{}
-	if cfg.Source == "alsasrc" {
+	if cfg.Source == "alsasrc" || cfg.Source == "pulsesrc" {
 		if cfg.Device != nil {
 			properties["device"] = *cfg.Device
 		} else {
@@ -125,7 +125,7 @@ func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.Con
 			Channels: cfg.Channels,
 			Rate:     48000,
 		},
-		Queue: cfg.USE_QUEUE,
+		Queue: cfg.Queue,
 		Codec: cfg.Codec,
 	}
 
@@ -170,7 +170,7 @@ func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.Con
 			Width:  cfg.Width,
 			Height: cfg.Height,
 		},
-		Queue: cfg.USE_QUEUE,
+		Queue: cfg.Queue,
 		Codec: cfg.Codec,
 	}
 
@@ -225,10 +225,20 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 	// for the given codec
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		wh.lg.Info("received track", zap.String("kind", track.Kind().String()), zap.String("codec", track.Codec().MimeType))
+		cfg := wh.cfg.AudioSink
 
 		if track.Codec().MimeType != "audio/opus" {
 			wh.lg.Error("mimetype not supported", zap.String("mime", track.Codec().MimeType))
 			return
+		}
+
+		properties := map[string]interface{}{}
+		if cfg.Sink == "alsasink" || cfg.Sink == "pulsesink" {
+			if cfg.Device != nil {
+				properties["device"] = *cfg.Device
+			} else {
+				properties["device"] = cfg.DeviceName
+			}
 		}
 
 		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
@@ -253,7 +263,11 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 		}()
 
 		pipeline, err := streamer.CreateAudioPipelineSrc(streamer.StreamElement{
-			Kind: "autoaudiosink",
+			Kind: cfg.Sink,
+			Properties: map[string]interface{}{
+				"device": cfg.Device,
+			},
+			Queue: cfg.Queue,
 		})
 		if err != nil {
 			wh.lg.Error("failed to create src pipeline", zap.Error(err))
