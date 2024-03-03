@@ -1,5 +1,5 @@
 build:
-	CGO_ENABLED=1 go build -mod=vendor -tags=embed -o service main.go
+	CGO_ENABLED=1 go build -mod=vendor -tags=embed -ldflags "-s -w" -trimpath -o service main.go
 
 build-static:
 	npm --prefix static ci && npm --prefix static run build
