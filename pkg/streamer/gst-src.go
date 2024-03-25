@@ -47,7 +47,7 @@ func CreateAudioPipelineSrc(dst StreamElement) (*SrcPipeline, error) {
 	sink := elems[len(elems)-1]
 
 	for name, value := range dst.Properties {
-		sink.SetProperty(name, value)
+		sink.Set(name, value)
 	}
 
 	// Add the elements to the pipeline and link them

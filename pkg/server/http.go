@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kaedwen/webrtc/pkg/common"
 	"github.com/kaedwen/webrtc/static"
-	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -18,8 +17,8 @@ import (
 
 type SignalingHandle struct {
 	Id   string
-	Recv chan webrtc.SessionDescription
-	Trcv chan webrtc.SessionDescription
+	Recv chan *IncomingSignalingMessage
+	Trcv chan *OutgoingSignalingMessage
 }
 
 type HttpServer struct {
@@ -32,8 +31,8 @@ type HttpServer struct {
 func NewSignalingHandle(id string) SignalingHandle {
 	return SignalingHandle{
 		Id:   id,
-		Recv: make(chan webrtc.SessionDescription, 10),
-		Trcv: make(chan webrtc.SessionDescription, 10),
+		Recv: make(chan *IncomingSignalingMessage, 10),
+		Trcv: make(chan *OutgoingSignalingMessage, 10),
 	}
 }
 
@@ -143,8 +142,8 @@ func (h *HttpServer) signalingHandler(c *gin.Context) {
 	go func() {
 		for {
 			// wait and read/parse message
-			var sdp webrtc.SessionDescription
-			err := wsjson.Read(ctx, conn, &sdp)
+			var m IncomingSignalingMessage
+			err := wsjson.Read(ctx, conn, &m)
 			if err != nil {
 				status := websocket.CloseStatus(err)
 				if status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
@@ -161,18 +160,18 @@ func (h *HttpServer) signalingHandler(c *gin.Context) {
 				break
 			}
 
-			h.lg.Info("received message", zap.String("type", sdp.Type.String()))
+			h.lg.Info("received message", zap.String("type", m.Type))
 
 			// forward in channel
-			hndl.Recv <- sdp
+			hndl.Recv <- &m
 		}
 
 		cancel()
 	}()
 
 	// loop write
-	for sdp := range hndl.Trcv {
-		err := wsjson.Write(ctx, conn, sdp)
+	for m := range hndl.Trcv {
+		err := wsjson.Write(ctx, conn, m)
 		if err != nil {
 			status := websocket.CloseStatus(err)
 			if status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
@@ -184,7 +183,7 @@ func (h *HttpServer) signalingHandler(c *gin.Context) {
 			break
 		}
 
-		h.lg.Info("tranceived message", zap.String("type", sdp.Type.String()))
+		h.lg.Info("tranceived message", zap.String("type", m.Type))
 	}
 
 }

@@ -221,6 +221,13 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 	// create a context for this handle
 	hctx, hcancel := context.WithCancel(rctx)
 
+	// sent the candidate out when where is one
+	peerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
+		if i != nil {
+			sh.Trcv <- server.NewIceCandidateMessage(*i)
+		}
+	})
+
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
 	// for the given codec
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
@@ -263,11 +270,9 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 		}()
 
 		pipeline, err := streamer.CreateAudioPipelineSrc(streamer.StreamElement{
-			Kind: cfg.Sink,
-			Properties: map[string]interface{}{
-				"device": cfg.Device,
-			},
-			Queue: cfg.Queue,
+			Kind:       cfg.Sink,
+			Properties: properties,
+			Queue:      cfg.Queue,
 		})
 		if err != nil {
 			wh.lg.Error("failed to create src pipeline", zap.Error(err))
@@ -358,7 +363,7 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 		}
 
 		// Create channel that is blocked until ICE Gathering is complete
-		gatherComplete := webrtc.GatheringCompletePromise(peerConnection)
+		//gatherComplete := webrtc.GatheringCompletePromise(peerConnection)
 
 		// Sets the LocalDescription, and starts our UDP listeners
 		err = peerConnection.SetLocalDescription(answer)
@@ -366,23 +371,23 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 			return err
 		}
 
-		<-gatherComplete
+		//<-gatherComplete
 
 		// Send the answer
-		sh.Trcv <- *peerConnection.LocalDescription()
+		sh.Trcv <- server.NewAnswerMessage(peerConnection.LocalDescription())
 
 		return nil
 	}
 
-	hndl := PeerHandle{
-		audioTrack: audioTrack,
-		videoTrack: videoTrack,
-	}
+	hndl := PeerHandle{audioTrack, videoTrack}
+
+	// add handle to list
+	wh.peerHandles[sh.Id] = &hndl
 
 	go func() {
 		for {
 			select {
-			case offer, ok := <-sh.Recv:
+			case m, ok := <-sh.Recv:
 				// return when channel is closed
 				if !ok {
 					wh.mu.Lock()
@@ -399,18 +404,41 @@ func (wh *WebrtcHandler) createPeerHandle(rctx context.Context, sh *server.Signa
 					return
 				}
 
-				err := onOfferReceived(offer)
-				if err != nil {
-					wh.lg.Error("failed to handle offer", zap.Error(err))
+				switch true {
+				case m.IsIceCandidateMessage():
+					pm, err := m.ToIceCandidateMessage()
+					if err != nil {
+						wh.lg.Error("failed to parse candidate", zap.Error(err))
+						continue
+					}
+
+					wh.lg.Info("received new ice candidate", zap.Any("candidate", pm.Candidate))
+
+					err = peerConnection.AddICECandidate(pm.Candidate)
+					if err != nil {
+						wh.lg.Error("failed to add ice candidate", zap.Error(err))
+					}
+				case m.IsAnswerMessage():
+					wh.lg.Info("received answer", zap.Any("data", m.Data))
+				case m.IsOfferMessage():
+					pm, err := m.ToOfferMessage()
+					if err != nil {
+						wh.lg.Error("failed to parse offer", zap.Error(err))
+						continue
+					}
+
+					wh.lg.Info("received offer", zap.Any("data", pm.Offer))
+
+					err = onOfferReceived(pm.Offer)
+					if err != nil {
+						wh.lg.Error("failed to handle offer", zap.Error(err))
+					}
 				}
 			case <-hctx.Done():
 				return
 			}
 		}
 	}()
-
-	// add handle to list
-	wh.peerHandles[sh.Id] = &hndl
 
 	return nil
 }
