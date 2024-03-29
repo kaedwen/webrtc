@@ -120,18 +120,14 @@ func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.Con
 	src := streamer.StreamElement{
 		Kind:       cfg.Source,
 		Properties: properties,
-		Caps: &streamer.StreamElementCaps{
-			Mime:     "audio/x-raw",
-			Channels: cfg.Channels,
-			Rate:     48000,
-		},
-		Queue: cfg.Queue,
-		Codec: cfg.Codec,
+		Caps:       streamer.NewCapsBuilder("audio/x-raw").Channels(int(cfg.Channels)).Rate(48000),
+		Queue:      cfg.Queue,
+		Codec:      cfg.Codec,
 	}
 
 	var err error
 	var audioCh <-chan media.Sample
-	wh.audioPipeline, audioCh, err = streamer.CreateAudioPipelineSink(src)
+	wh.audioPipeline, audioCh, err = streamer.CreateAudioPipelineSink(src, wh.lg)
 	if err != nil {
 		return err
 	}
@@ -164,19 +160,14 @@ func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.Con
 		Properties: map[string]interface{}{
 			"device": cfg.Device,
 		},
-		Caps: &streamer.StreamElementCaps{
-			Mime:   "video/x-raw",
-			Format: "YUY2",
-			Width:  cfg.Width,
-			Height: cfg.Height,
-		},
+		Caps:  streamer.NewCapsBuilder("video/x-raw").Format("YUY2").Width(int(cfg.Width)).Height(int(cfg.Height)),
 		Queue: cfg.Queue,
 		Codec: cfg.Codec,
 	}
 
 	var err error
 	var videoCh <-chan media.Sample
-	wh.videoPipeline, videoCh, err = streamer.CreateVideoPipelineSink(src)
+	wh.videoPipeline, videoCh, err = streamer.CreateVideoPipelineSinkWithLaunch(src, wh.lg)
 	if err != nil {
 		return err
 	}

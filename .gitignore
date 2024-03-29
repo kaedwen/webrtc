@@ -1,2 +1,4 @@
 service*
 renew.local.env
+test
+.vscode

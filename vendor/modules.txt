@@ -4,6 +4,10 @@ github.com/alexflint/go-arg
 # github.com/alexflint/go-scalar v1.2.0
 ## explicit; go 1.15
 github.com/alexflint/go-scalar
+# github.com/blackjack/webcam v0.5.0
+## explicit; go 1.18
+github.com/blackjack/webcam
+github.com/blackjack/webcam/ioctl
 # github.com/bytedance/sonic v1.11.2
 ## explicit; go 1.16
 github.com/bytedance/sonic
@@ -97,6 +101,8 @@ github.com/json-iterator/go
 # github.com/klauspost/cpuid/v2 v2.2.7
 ## explicit; go 1.15
 github.com/klauspost/cpuid/v2
+# github.com/kr/pretty v0.2.1
+## explicit; go 1.12
 # github.com/leodido/go-urn v1.4.0
 ## explicit; go 1.18
 github.com/leodido/go-urn
@@ -167,6 +173,23 @@ github.com/pion/logging
 # github.com/pion/mdns v0.0.12
 ## explicit; go 1.19
 github.com/pion/mdns
+# github.com/pion/mediadevices v0.6.1
+## explicit; go 1.19
+github.com/pion/mediadevices
+github.com/pion/mediadevices/internal/logging
+github.com/pion/mediadevices/pkg/avfoundation
+github.com/pion/mediadevices/pkg/codec
+github.com/pion/mediadevices/pkg/codec/x264
+github.com/pion/mediadevices/pkg/driver
+github.com/pion/mediadevices/pkg/driver/availability
+github.com/pion/mediadevices/pkg/driver/camera
+github.com/pion/mediadevices/pkg/frame
+github.com/pion/mediadevices/pkg/io
+github.com/pion/mediadevices/pkg/io/audio
+github.com/pion/mediadevices/pkg/io/video
+github.com/pion/mediadevices/pkg/prop
+github.com/pion/mediadevices/pkg/wave
+github.com/pion/mediadevices/pkg/wave/mixer
 # github.com/pion/randutil v0.1.0
 ## explicit; go 1.14
 github.com/pion/randutil
@@ -271,6 +294,10 @@ golang.org/x/crypto/cryptobyte/asn1
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/curve25519/internal/field
 golang.org/x/crypto/sha3
+# golang.org/x/image v0.15.0
+## explicit; go 1.18
+golang.org/x/image/draw
+golang.org/x/image/math/f64
 # golang.org/x/mod v0.15.0
 ## explicit; go 1.18
 golang.org/x/mod/semver
