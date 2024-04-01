@@ -1,12 +1,12 @@
 
 :host {
-  max-height: 90%;
-  max-width: 80%;
-  height: 90%;
-  width: auto;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
 }
 
 video {
+  object-fit: contain;
   height: 100%;
   width: 100%;
 }
