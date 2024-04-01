@@ -155,19 +155,19 @@ func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.Con
 }
 
 func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.ConfigVideoSourceStream) error {
-	src := streamer.StreamElement{
-		Kind: cfg.Source,
-		Properties: map[string]interface{}{
-			"device": cfg.Device,
-		},
-		Caps:  streamer.NewCapsBuilder("video/x-raw").Format("YUY2").Width(int(cfg.Width)).Height(int(cfg.Height)),
-		Queue: cfg.Queue,
-		Codec: cfg.Codec,
-	}
+	// src := streamer.StreamElement{
+	// 	Kind: cfg.Source,
+	// 	Properties: map[string]interface{}{
+	// 		"device": cfg.Device,
+	// 	},
+	// 	Caps:  streamer.NewCapsBuilder("video/x-raw").Format("YUY2").Width(int(cfg.Width)).Height(int(cfg.Height)),
+	// 	Queue: cfg.Queue,
+	// 	Codec: cfg.Codec,
+	// }
 
 	var err error
 	var videoCh <-chan media.Sample
-	wh.videoPipeline, videoCh, err = streamer.CreateVideoPipelineSinkWithLaunch(src, wh.lg)
+	wh.videoPipeline, videoCh, err = streamer.CreateVideoPipelineSinkWithLaunch(wh.lg)
 	if err != nil {
 		return err
 	}

@@ -38,7 +38,10 @@ func setCallback(sink *app.Sink, ch chan media.Sample) {
 	})
 }
 
-func CreateVideoPipelineSinkWithLaunch(s StreamElement, _ *zap.Logger) (*gst.Pipeline, <-chan media.Sample, error) {
+func CreateVideoPipelineSinkWithLaunch(_ *zap.Logger, s StreamElement) (*gst.Pipeline, <-chan media.Sample, error) {
+	pb := NewPipelineBuilder()
+
+	pb.AddWithProperties("v4l2src", map[string]any{"device", s.})
 	pipeline, err := gst.NewPipelineFromString(`v4l2src device=/dev/video4 ! capsfilter caps="video/x-raw,width=(int)320,height=(int)240" ! videoconvert ! queue ! capsfilter caps="video/x-raw,format=(string)I420" ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! capsfilter caps="video/x-h264,stream-format=(string)byte-stream" ! appsink name=appsink`)
 	if err != nil {
 		return nil, nil, err
@@ -56,130 +59,92 @@ func CreateVideoPipelineSinkWithLaunch(s StreamElement, _ *zap.Logger) (*gst.Pip
 	return pipeline, ch, nil
 }
 
-func CreateVideoPipelineSink(s StreamElement, lg *zap.Logger) (*gst.Pipeline, <-chan media.Sample, error) {
+func CreateVideoPipelineSink(lg *zap.Logger, s StreamElement) (*gst.Pipeline, <-chan media.Sample, error) {
 	// Create a pipeline
 	pipeline, err := gst.NewPipeline("pion-video-pipeline")
 	if err != nil {
 		return nil, nil, err
 	}
 
-	elems := make([]*gst.Element, 0)
-
 	// Create the src
-	src, err := gst.NewElement(s.Kind)
+	src, err := gst.NewElement("v4l2src")
 	if err != nil {
 		return nil, nil, err
 	}
-	elems = append(elems, src)
 
-	for name, value := range s.Properties {
-		src.Set(name, value)
-	}
+	src.Set("device", "/dev/video4")
 
-	if s.Caps != nil {
-		filter, err := gst.NewElement("capsfilter")
-		if err != nil {
-			return nil, nil, err
-		}
-		elems = append(elems, filter)
-
-		c := s.Caps.Build()
-		lg.Info("capsfilter", zap.String("caps", c.String()))
-		err = filter.SetProperty("caps", c)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
+	src_c := gst.NewEmptySimpleCaps("video/x-raw")
+	src_c.SetValue("width", int(320))
+	src_c.SetValue("height", int(240))
+	lg.Info("capsfilter", zap.String("caps", src_c.String()))
 
 	// just to be on the save side
 	conv, err := gst.NewElement("videoconvert")
 	if err != nil {
 		return nil, nil, err
 	}
-	elems = append(elems, conv)
 
-	if s.Queue {
-		// add a queue
-		queue, err := gst.NewElement("queue")
-		if err != nil {
-			return nil, nil, err
-		}
-		elems = append(elems, queue)
+	// add a queue
+	queue, err := gst.NewElement("queue")
+	if err != nil {
+		return nil, nil, err
 	}
 
-	switch s.Codec {
-	case common.VP8:
-		// Create the enc
-		enc, err := gst.NewElement("vp8enc")
-		if err != nil {
-			return nil, nil, err
-		}
-		elems = append(elems, enc)
+	enc_in_c := gst.NewEmptySimpleCaps("video/x-raw")
+	enc_in_c.SetValue("format", "I420")
+	lg.Info("capsfilter", zap.String("caps", enc_in_c.String()))
 
-		enc.SetProperty("error-resilient", "partitions")
-		enc.SetProperty("keyframe-max-dist", 10)
-		enc.SetProperty("auto-alt-ref", true)
-		enc.SetProperty("cpu-used", 5)
-		enc.SetProperty("deadline", 1)
-	case common.H264:
-		filterIn, err := gst.NewElement("capsfilter")
-		if err != nil {
-			return nil, nil, err
-		}
-		elems = append(elems, filterIn)
-
-		cIn := gst.NewEmptySimpleCaps("video/x-raw")
-		cIn.SetValue("format", "I420")
-		lg.Info("capsfilter", zap.String("caps", cIn.String()))
-		err = filterIn.SetProperty("caps", cIn)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Create the enc
-		enc, err := gst.NewElement("x264enc")
-		if err != nil {
-			return nil, nil, err
-		}
-		elems = append(elems, enc)
-
-		enc.SetProperty("speed-preset", "ultrafast")
-		enc.SetProperty("tune", "zerolatency")
-		enc.SetProperty("key-int-max", 20)
-		//enc.SetProperty("bitrate", 300)
-
-		filterOut, err := gst.NewElement("capsfilter")
-		if err != nil {
-			return nil, nil, err
-		}
-		elems = append(elems, filterOut)
-
-		cOut := gst.NewEmptySimpleCaps("video/x-h264")
-		cOut.SetValue("stream-format", "byte-stream")
-		lg.Info("capsfilter", zap.String("caps", cOut.String()))
-		err = filterOut.SetProperty("caps", cOut)
-		if err != nil {
-			return nil, nil, err
-		}
-	default:
-		return nil, nil, fmt.Errorf("unsupported video codec given - %s", s.Codec)
+	// Create the enc
+	enc, err := gst.NewElement("x264enc")
+	if err != nil {
+		return nil, nil, err
 	}
+
+	enc.SetProperty("speed-preset", "ultrafast")
+	enc.SetProperty("tune", "zerolatency")
+	enc.SetProperty("key-int-max", 20)
+	//enc.SetProperty("bitrate", 300)
+
+	enc_out_c := gst.NewEmptySimpleCaps("video/x-h264")
+	enc_out_c.SetValue("stream-format", "byte-stream")
+	lg.Info("capsfilter", zap.String("caps", enc_out_c.String()))
 
 	// Create the sink
 	appsink, err := app.NewAppSink()
 	if err != nil {
 		return nil, nil, err
 	}
-	elems = append(elems, appsink.Element)
 
 	ch := make(chan media.Sample, 100)
 	setCallback(appsink, ch)
 
 	// Add the elements to the pipeline
-	pipeline.AddMany(elems...)
+	err = pipeline.AddMany(src, conv, queue, enc, appsink.Element)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// link the elements
-	gst.ElementLinkMany(elems...)
+	err = src.LinkFiltered(conv, src_c)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = conv.Link(queue)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = queue.LinkFiltered(enc, enc_in_c)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = enc.LinkFiltered(appsink.Element, enc_out_c)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return pipeline, ch, nil
 }
@@ -191,32 +156,24 @@ func CreateAudioPipelineSink(s StreamElement, lg *zap.Logger) (*gst.Pipeline, <-
 		return nil, nil, err
 	}
 
-	elems := make([]*gst.Element, 0)
+	elems := make(ElementList, 0)
 
 	// Create the src
 	src, err := gst.NewElement(s.Kind)
 	if err != nil {
 		return nil, nil, err
 	}
-	elems = append(elems, src)
 
 	for name, value := range s.Properties {
 		src.Set(name, value)
 	}
 
 	if s.Caps != nil {
-		filter, err := gst.NewElement("capsfilter")
-		if err != nil {
-			return nil, nil, err
-		}
-		elems = append(elems, filter)
-
 		c := s.Caps.Build()
 		lg.Info("capsfilter", zap.String("caps", c.String()))
-		err = filter.SetProperty("caps", c)
-		if err != nil {
-			return nil, nil, err
-		}
+		elems = append(elems, Element{src, c})
+	} else {
+		elems = append(elems, Element{src, nil})
 	}
 
 	// just to be on the save side
@@ -224,7 +181,7 @@ func CreateAudioPipelineSink(s StreamElement, lg *zap.Logger) (*gst.Pipeline, <-
 	if err != nil {
 		return nil, nil, err
 	}
-	elems = append(elems, conv)
+	elems = append(elems, Element{conv, nil})
 
 	if s.Queue {
 		// add a queue
@@ -232,7 +189,7 @@ func CreateAudioPipelineSink(s StreamElement, lg *zap.Logger) (*gst.Pipeline, <-
 		if err != nil {
 			return nil, nil, err
 		}
-		elems = append(elems, queue)
+		elems = append(elems, Element{queue, nil})
 	}
 
 	switch s.Codec {
@@ -242,7 +199,7 @@ func CreateAudioPipelineSink(s StreamElement, lg *zap.Logger) (*gst.Pipeline, <-
 		if err != nil {
 			return nil, nil, err
 		}
-		elems = append(elems, enc)
+		elems = append(elems, Element{enc, nil})
 	default:
 		return nil, nil, fmt.Errorf("unsupported audio codec given - %s", s.Codec)
 	}
@@ -252,16 +209,22 @@ func CreateAudioPipelineSink(s StreamElement, lg *zap.Logger) (*gst.Pipeline, <-
 	if err != nil {
 		return nil, nil, err
 	}
-	elems = append(elems, appsink.Element)
+	elems = append(elems, Element{appsink.Element, nil})
 
 	ch := make(chan media.Sample, 100)
 	setCallback(appsink, ch)
 
 	// Add the elements to the pipeline
-	pipeline.AddMany(elems...)
+	err = pipeline.AddMany(elems.List()...)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// link the elements
-	gst.ElementLinkMany(elems...)
+	err = elems.Link()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return pipeline, ch, nil
 }
