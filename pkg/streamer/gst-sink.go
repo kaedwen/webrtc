@@ -38,11 +38,56 @@ func setCallback(sink *app.Sink, ch chan media.Sample) {
 	})
 }
 
-func CreateVideoPipelineSinkWithLaunch(_ *zap.Logger, s StreamElement) (*gst.Pipeline, <-chan media.Sample, error) {
+func CreateVideoPipelineSinkWithLaunch(lg *zap.Logger, s StreamElement) (*gst.Pipeline, <-chan media.Sample, error) {
 	pb := NewPipelineBuilder()
 
-	pb.AddWithProperties("v4l2src", map[string]any{"device", s.})
-	pipeline, err := gst.NewPipelineFromString(`v4l2src device=/dev/video4 ! capsfilter caps="video/x-raw,width=(int)320,height=(int)240" ! videoconvert ! queue ! capsfilter caps="video/x-raw,format=(string)I420" ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! capsfilter caps="video/x-h264,stream-format=(string)byte-stream" ! appsink name=appsink`)
+	pb.AddWithProperties("v4l2src", s.Properties)
+	pb.AddFilter(s.SrcCaps)
+	pb.Add("videoconvert")
+
+	if s.Queue {
+		pb.Add("queue")
+	}
+
+	switch s.Codec {
+	case common.VP8:
+		pb.AddWithProperties("vp8enc", map[string]any{
+			"bitrate":           s.Bitrate,
+			"error-resilient":   "partitions",
+			"keyframe-max-dist": int(10),
+			"cpu-used":          int(5),
+			"deadline":          int(1),
+			"auto-alt-ref":      true,
+		})
+	case common.VP9:
+		pb.AddWithProperties("vp9enc", map[string]any{
+			"bitrate": s.Bitrate,
+		})
+	case common.H264:
+		pb.AddFilter(NewCaps("video/x-raw", map[string]any{
+			"format": "I420",
+		}))
+		pb.AddWithProperties("x264enc", map[string]any{
+			"bitrate":      s.Bitrate,
+			"speed-preset": "ultrafast",
+			"tune":         "zerolatency",
+			"key-int-max":  int(20),
+		})
+		pb.AddFilter(NewCaps("video/x-h264", map[string]any{
+			"stream-format": "byte-stream",
+		}))
+	default:
+		return nil, nil, fmt.Errorf("unsupported video codec given - %s", s.Codec)
+	}
+
+	pb.AddWithProperties("appsink", map[string]any{
+		"name": "appsink",
+	})
+
+	ps := pb.Build()
+	lg.Info("launch pipeline", zap.String("definition", ps))
+
+	pipeline, err := gst.NewPipelineFromString(ps)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -168,13 +213,13 @@ func CreateAudioPipelineSink(s StreamElement, lg *zap.Logger) (*gst.Pipeline, <-
 		src.Set(name, value)
 	}
 
-	if s.Caps != nil {
-		c := s.Caps.Build()
-		lg.Info("capsfilter", zap.String("caps", c.String()))
-		elems = append(elems, Element{src, c})
-	} else {
-		elems = append(elems, Element{src, nil})
-	}
+	// if s.Caps != nil {
+	// 	c := s.Caps.Build()
+	// 	lg.Info("capsfilter", zap.String("caps", c.String()))
+	// 	elems = append(elems, Element{src, c})
+	// } else {
+	// 	elems = append(elems, Element{src, nil})
+	// }
 
 	// just to be on the save side
 	conv, err := gst.NewElement("audioconvert")

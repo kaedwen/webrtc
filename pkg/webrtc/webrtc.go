@@ -3,6 +3,7 @@ package webrtc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -120,9 +121,12 @@ func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.Con
 	src := streamer.StreamElement{
 		Kind:       cfg.Source,
 		Properties: properties,
-		Caps:       streamer.NewCapsBuilder("audio/x-raw").Channels(int(cfg.Channels)).Rate(48000),
-		Queue:      cfg.Queue,
-		Codec:      cfg.Codec,
+		SrcCaps: streamer.NewCaps("audio/x-raw", map[string]any{
+			"channels": cfg.Channels,
+			"rate":     48000,
+		}),
+		Queue: cfg.Queue,
+		Codec: cfg.Codec,
 	}
 
 	var err error
@@ -155,19 +159,25 @@ func (wh *WebrtcHandler) handleAudioSamples(ctx context.Context, cfg *common.Con
 }
 
 func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.ConfigVideoSourceStream) error {
-	// src := streamer.StreamElement{
-	// 	Kind: cfg.Source,
-	// 	Properties: map[string]interface{}{
-	// 		"device": cfg.Device,
-	// 	},
-	// 	Caps:  streamer.NewCapsBuilder("video/x-raw").Format("YUY2").Width(int(cfg.Width)).Height(int(cfg.Height)),
-	// 	Queue: cfg.Queue,
-	// 	Codec: cfg.Codec,
-	// }
+	src := streamer.StreamElement{
+		Kind: cfg.Source,
+		Properties: map[string]interface{}{
+			"device": cfg.Device,
+		},
+		SrcCaps: streamer.NewCaps("video/x-raw", map[string]any{
+			"height":    cfg.Height,
+			"width":     cfg.Width,
+			"framerate": fmt.Sprintf("%d/1", cfg.Framerate),
+			"format":    "YUY2",
+		}),
+		Bitrate: cfg.Bitrate,
+		Queue:   cfg.Queue,
+		Codec:   cfg.Codec,
+	}
 
 	var err error
 	var videoCh <-chan media.Sample
-	wh.videoPipeline, videoCh, err = streamer.CreateVideoPipelineSinkWithLaunch(wh.lg)
+	wh.videoPipeline, videoCh, err = streamer.CreateVideoPipelineSinkWithLaunch(wh.lg, src)
 	if err != nil {
 		return err
 	}

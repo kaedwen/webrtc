@@ -49,12 +49,14 @@ type ConfigHTTP struct {
 }
 
 type ConfigVideoSourceStream struct {
-	Source string      `arg:"--video-src,env:VIDEO_SRC" default:"v4l2src"`
-	Device string      `arg:"--video-src-device,env:VIDEO_SRC_DEVICE" default:"/dev/video0"`
-	Codec  StreamCodec `arg:"--video-src-codec,env:VIDEO_SRC_CODEC" default:"vp8"`
-	Height uint        `arg:"--video-src-height,env:VIDEO_SRC_HEIGHT" default:"480"`
-	Width  uint        `arg:"--video-src-width,env:VIDEO_SRC_WIDTH" default:"640"`
-	Queue  bool        `arg:"--video-src-queue,env:VIDEO_SRC_QUEUE" default:"false"`
+	Source    string      `arg:"--video-src,env:VIDEO_SRC" default:"v4l2src"`
+	Device    string      `arg:"--video-src-device,env:VIDEO_SRC_DEVICE" default:"/dev/video0"`
+	Codec     StreamCodec `arg:"--video-src-codec,env:VIDEO_SRC_CODEC" default:"vp8"`
+	Height    uint        `arg:"--video-src-height,env:VIDEO_SRC_HEIGHT" default:"480"`
+	Width     uint        `arg:"--video-src-width,env:VIDEO_SRC_WIDTH" default:"640"`
+	Framerate uint        `arg:"--video-src-fps,env:VIDEO_SRC_FPS" default:"30"`
+	Bitrate   uint        `arg:"--video-src-bps,env:VIDEO_SRC_BPS" default:"300"`
+	Queue     bool        `arg:"--video-src-queue,env:VIDEO_SRC_QUEUE" default:"false"`
 }
 
 type ConfigAudioSourceStream struct {
