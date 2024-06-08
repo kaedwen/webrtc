@@ -9,12 +9,13 @@ import (
 
 func NewLogger(cfg *ConfigLogging) (*zap.Logger, error) {
 	var c zap.Config
-	if cfg.Level == "debug" {
+	if cfg.Level.Level().CapitalString() == "DEBUG" {
 		c = zap.NewDevelopmentConfig()
 	} else {
 		c = zap.NewProductionConfig()
 	}
 
+	c.Level = cfg.Level
 	c.EncoderConfig.TimeKey = "time"
 	c.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.RFC3339)
 

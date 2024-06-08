@@ -1,4 +1,6 @@
 service*
 renew.local.env
+config.yaml
+__debug*
 test
 .vscode

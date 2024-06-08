@@ -10,21 +10,9 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/main.go",
-      "env": {
-        "HTTP_STATIC": "${workspaceFolder}/static/dist",
-        "VIDEO_SRC_DEVICE": "/dev/v4l/by-id/usb-Microsoft_Microsoft®_LifeCam_HD-3000-video-index0",
-        //"AUDIO_SRC_DEVICE": "plughw:4,0,0",
-        "AUDIO_SRC": "pulsesrc",
-        "AUDIO_SINK": "pulsesink",
-        "INPUT_DEVICE": "/dev/input/event5",
-        "JINGLE_PATH": "${workspaceFolder}/audio",
-        "SONOS_TARGET": "Living Room",
-        "VIDEO_SRC_CODEC": "H264",
-        "VIDEO_SRC_HEIGHT": "600",
-        "VIDEO_SRC_WIDTH": "800",
-        "VIDEO_SRC_FPS": "15",
-        "VIDEO_SRC_BPS": "8000",
-      }
+      "args": [
+        "--config=${workspaceFolder}/config.yaml"
+      ]
     },
     {
       "name": "Launch Package Test",

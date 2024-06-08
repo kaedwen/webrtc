@@ -40,7 +40,7 @@ func (s staticDiskSource) Open(p string) (common.StaticSourceFile, error) {
 
 func SetupHandler(e *gin.Engine, cfg *common.Config) {
 	if cfg.Http.StaticPath != nil {
-		handler := common.NewStaticHandler(staticDiskSource{*cfg.Http.StaticPath}, "index.html")
+		handler := common.NewStaticHandler(staticDiskSource{cfg.Http.StaticPath.String()}, "index.html")
 		e.NoRoute(func(c *gin.Context) {
 			encoding := c.Request.Header.Get("Accept-Encoding")
 

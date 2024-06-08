@@ -52,7 +52,7 @@ func CreateVideoPipelineSinkWithLaunch(lg *zap.Logger, s StreamElement) (*gst.Pi
 	switch s.Codec {
 	case common.VP8:
 		pb.AddWithProperties("vp8enc", map[string]any{
-			"bitrate":           s.Bitrate,
+			"target-bitrate":    s.Bitrate,
 			"error-resilient":   "partitions",
 			"keyframe-max-dist": int(10),
 			"cpu-used":          int(5),

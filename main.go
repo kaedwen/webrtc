@@ -27,14 +27,13 @@ func main() {
 		panic(err)
 	}
 
-	http := server.NewHttpServer(lg.With(zap.String("context", "server")), &cfg)
-
-	rh, err := ring.NewRingHandler(lg.With(zap.String("context", "ring")), &cfg.Ring)
-	if err != nil {
-		panic(err)
+	if cfg.Logging.Development {
+		lg.Info("configuration", zap.Any("", cfg))
 	}
 
-	err = rh.Watch(ctx)
+	http := server.NewHttpServer(lg.With(zap.String("context", "server")), &cfg)
+
+	err = ring.NewRingHandler(ctx, lg.With(zap.String("context", "ring")), &cfg.Ring)
 	if err != nil {
 		panic(err)
 	}

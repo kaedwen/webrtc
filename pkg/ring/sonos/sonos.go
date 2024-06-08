@@ -72,8 +72,8 @@ func NewSonosHandler(lg *zap.Logger, cfg *common.ConfigRing) (*SonosHandler, err
 	return &SonosHandler{lg, cfg, make(map[string]*SonosPlayer)}, nil
 }
 
-func (p *SonosPlayer) init() error {
-	req, err := http.NewRequest(http.MethodGet, p.address.JoinPath("api/v1/players/local/info").String(), nil)
+func (p *SonosPlayer) init(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.address.JoinPath("api/v1/players/local/info").String(), nil)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func (p *SonosPlayer) init() error {
 	return nil
 }
 
-func (p *SonosPlayer) Play(uri *url.URL, volume int) error {
+func (p *SonosPlayer) Play(ctx context.Context, uri *url.URL, volume int) error {
 	sab := sonosAudioClip{
 		Name:      "Pull Bell",
 		AppId:     "com.acme.app",
@@ -119,7 +119,7 @@ func (p *SonosPlayer) Play(uri *url.URL, volume int) error {
 		return err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, p.address.JoinPath(fmt.Sprintf("api/v1/players/%s/audioClip", p.info.PlayerId)).String(), bytes.NewBuffer(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.address.JoinPath(fmt.Sprintf("api/v1/players/%s/audioClip", p.info.PlayerId)).String(), bytes.NewBuffer(b))
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func (h *SonosHandler) Watch(ctx context.Context) error {
 						h.lg.Error("failed to create player", zap.Error(err))
 						continue
 					}
-					if err := p.init(); err != nil {
+					if err := p.init(ctx); err != nil {
 						h.lg.Error("failed to init player", zap.Error(err))
 						continue
 					}
@@ -188,10 +188,10 @@ func (h *SonosHandler) Watch(ctx context.Context) error {
 	return mdns.Query(params)
 }
 
-func (h *SonosHandler) Play(uri *url.URL) error {
+func (h *SonosHandler) Play(ctx context.Context, uri *url.URL) error {
 	for _, p := range h.players {
 		h.lg.Info("playing clip", zap.String("target", p.address.String()), zap.String("clip", uri.String()))
-		if err := p.Play(uri, h.cfg.SonosVolume); err != nil {
+		if err := p.Play(ctx, uri, h.cfg.SonosVolume); err != nil {
 			h.lg.Error("failed to play", zap.String("address", p.address.String()), zap.Error(err))
 		}
 	}

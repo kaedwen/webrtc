@@ -56,9 +56,10 @@ func NewHttpServer(lg *zap.Logger, cfg *common.Config) *HttpServer {
 }
 
 func (h *HttpServer) ListenAndServe(ctx context.Context) error {
+	// set the configured address
+	h.Addr = h.cfg.Http.Address()
+
 	if h.cfg.Http.Tls {
-		// set the configured address
-		h.Addr = h.cfg.Http.Address()
 
 		if h.cfg.Http.TlsCert != nil && h.cfg.Http.TlsKey != nil {
 			cert, err := tls.LoadX509KeyPair(*h.cfg.Http.TlsCert, *h.cfg.Http.TlsKey)
@@ -92,9 +93,6 @@ func (h *HttpServer) ListenAndServe(ctx context.Context) error {
 			}
 		}()
 	} else {
-		// set the configured address
-		h.Addr = h.cfg.Http.Address()
-
 		go func() {
 			// and listen
 			if err := h.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

@@ -14,7 +14,7 @@ import (
 )
 
 type PlayHandler interface {
-	Play(*url.URL) error
+	Play(context.Context, *url.URL) error
 	Watch(context.Context) error
 }
 
@@ -24,16 +24,22 @@ type RingHandler struct {
 	playHandlers []PlayHandler
 }
 
-func NewRingHandler(lg *zap.Logger, cfg *common.ConfigRing) (*RingHandler, error) {
+func NewRingHandler(ctx context.Context, lg *zap.Logger, cfg *common.ConfigRing) error {
 	spl, err := sonos.NewSonosHandler(lg.With(zap.String("context", "sonos")), cfg)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &RingHandler{lg, cfg, []PlayHandler{spl}}, nil
+	rh := &RingHandler{lg, cfg, []PlayHandler{spl}}
+
+	if err = rh.watch(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (h *RingHandler) Watch(ctx context.Context) error {
+func (h *RingHandler) watch(ctx context.Context) error {
 	if h.cfg.Device == nil {
 		h.lg.Warn("nothing to watch for key press")
 		return nil
@@ -75,9 +81,9 @@ func (h *RingHandler) Watch(ctx context.Context) error {
 			e, err := d.ReadOne()
 			if err == nil && e.Code == key && e.Value == 0 {
 				// run all players
-				tu := bu.JoinPath(h.cfg.JinglePath)
+				tu := bu.JoinPath(h.cfg.JinglePath.String())
 				for _, p := range h.playHandlers {
-					if err := p.Play(tu); err != nil {
+					if err := p.Play(ctx, tu); err != nil {
 						h.lg.Error("failed to play", zap.Error(err))
 					}
 				}
