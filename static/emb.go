@@ -13,7 +13,7 @@ import (
 	"github.com/kaedwen/webrtc/pkg/common"
 )
 
-//go:embed dist/*
+//go:embed dist/browser/*
 var f embed.FS
 
 type staticSourceFile struct {
@@ -42,7 +42,7 @@ func (s staticSource) Open(p string) (common.StaticSourceFile, error) {
 }
 
 func SetupHandler(e *gin.Engine, cfg *common.Config) {
-	handler := common.NewStaticHandler(staticSource{"dist"}, "index.html")
+	handler := common.NewStaticHandler(staticSource{"dist/browser"}, "index.html")
 	e.NoRoute(func(c *gin.Context) {
 		encoding := c.Request.Header.Get("Accept-Encoding")
 

@@ -59,7 +59,10 @@ func NewWebrtcHandler(ctx context.Context, lg *zap.Logger, cfg *common.ConfigStr
 				wh.lg.Info("new connection", zap.String("id", sh.Id))
 
 				// create new peer handle
-				wh.createPeerHandle(ctx, sh)
+				if err := wh.createPeerHandle(ctx, sh); err != nil {
+					lg.Error("failed to create peer handle", zap.Error(err))
+					continue
+				}
 
 				// make sure the pipelines are running
 				wh.startPipelines()

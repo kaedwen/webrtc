@@ -2,8 +2,8 @@ build:
 	CGO_ENABLED=1 go build -mod=vendor -tags=embed -ldflags "-s -w" -trimpath -o service main.go
 
 build-static:
-	npm --prefix static ci && npm --prefix static run build
-	cp -r audio static/dist/audio
+	npm --prefix static ci && npm --prefix static audit fix && npm --prefix static run build
+	cp -r audio static/dist/browser/audio
 
 build-armhf:
 	GOARCH=arm \
