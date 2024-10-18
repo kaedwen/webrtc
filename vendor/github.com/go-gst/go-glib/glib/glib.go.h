@@ -91,14 +91,14 @@ static void _g_object_set_one(gpointer object, const gchar *property_name,
   g_object_set(object, property_name, *(gpointer **)val, NULL);
 }
 
-static GValue *alloc_gvalue_list(int n) {
+static GValue *_alloc_gvalue_list(int n) {
   GValue *valv;
 
   valv = g_new0(GValue, n);
   return (valv);
 }
 
-static void val_list_insert(GValue *valv, int i, GValue *val) {
+static void _val_list_insert(GValue *valv, int i, GValue *val) {
   valv[i] = *val;
 }
 
@@ -139,21 +139,26 @@ static GObjectClass *_g_object_get_class(GObject *object) {
  * Closure support
  */
 
-extern void goMarshal(GClosure *, GValue *, guint, GValue *, gpointer,
-                      GValue *);
-
-static GClosure *_g_closure_new() {
-  GClosure *closure;
-
-  closure = g_closure_new_simple(sizeof(GClosure), NULL);
-  g_closure_set_marshal(closure, (GClosureMarshal)(goMarshal));
-  return (closure);
-}
+extern void goMarshal(GClosure *, GValue *, guint, GValue *, gpointer, gpointer);
 
 extern void removeClosure(gpointer, GClosure *);
 
-static void _g_closure_add_finalize_notifier(GClosure *closure) {
-  g_closure_add_finalize_notifier(closure, NULL, removeClosure);
+/**
+ * create a new closure, handle must be a cgo.Handle to a *closureContext
+ */
+static GClosure *_g_closure_new(guint handle)
+{
+  GClosure *closure;
+
+  // this allocation needs to be freed by the finalizer
+  guint *data = (guint *)malloc(sizeof(guint));
+  *data = handle;
+
+  closure = g_closure_new_simple(sizeof(GClosure), NULL);
+  g_closure_set_meta_marshal(closure, data, (GClosureMarshal)(goMarshal));
+  g_closure_add_finalize_notifier(closure, data, removeClosure);
+
+  return (closure);
 }
 
 static inline guint _g_signal_new(const gchar *name) {
@@ -187,5 +192,26 @@ static inline gchar **next_gcharptr(gchar **s) { return (s + 1); }
 
 extern void goCompareDataFuncs(gconstpointer a, gconstpointer b,
                                gpointer user_data);
+
+
+/**
+ * custom glib type for arbitrary go data
+ */
+
+#define GLIB_GO_TYPE_ARBITRARY_DATA (glib_go_arbitrary_data_get_type())
+
+typedef struct
+{
+  guint data; // Arbitrary data, corresponds to an uintptr in Go
+} GlibGoArbitraryData;
+
+GType glib_go_arbitrary_data_get_type(void);
+
+static GlibGoArbitraryData *glib_go_arbitrary_data_new(guint data);
+static GlibGoArbitraryData *glib_go_arbitrary_data_copy (GlibGoArbitraryData * orig);
+
+/**
+ * end custom glib type for arbitrary go data
+ */
 
 #endif

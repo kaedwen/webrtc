@@ -65,7 +65,7 @@ type ConfigRing struct {
 }
 
 type ConfigHTTP struct {
-	Host             string  `arg:"--http-host,env:HTTP_HOST" yaml:"host" default:"0.0.0.0"`
+	Host             string  `arg:"--http-host,env:HTTP_HOST" yaml:"host"`
 	Port             uint    `arg:"--http-port,env:HTTP_PORT" yaml:"port" default:"8080"`
 	Tls              bool    `arg:"--http-tls,env:HTTP_TLS" yaml:"tls" default:"true"`
 	TlsKey           *string `arg:"--http-tls-key,env:HTTP_TLS_KEY" yaml:"tls-key"`

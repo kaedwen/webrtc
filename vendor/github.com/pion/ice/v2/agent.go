@@ -7,6 +7,7 @@ package ice
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -323,9 +324,9 @@ func NewAgent(config *AgentConfig) (*Agent, error) { //nolint:gocognit
 
 		userBindingRequestHandler: config.BindingRequestHandler,
 	}
-	a.connectionStateNotifier = &handlerNotifier{connectionStateFunc: a.onConnectionStateChange}
-	a.candidateNotifier = &handlerNotifier{candidateFunc: a.onCandidate}
-	a.selectedCandidatePairNotifier = &handlerNotifier{candidatePairFunc: a.onSelectedCandidatePairChange}
+	a.connectionStateNotifier = &handlerNotifier{connectionStateFunc: a.onConnectionStateChange, done: make(chan struct{})}
+	a.candidateNotifier = &handlerNotifier{candidateFunc: a.onCandidate, done: make(chan struct{})}
+	a.selectedCandidatePairNotifier = &handlerNotifier{candidatePairFunc: a.onSelectedCandidatePairChange, done: make(chan struct{})}
 
 	if a.net == nil {
 		a.net, err = stdnet.NewNet()
@@ -915,7 +916,21 @@ func (a *Agent) removeUfragFromMux() {
 
 // Close cleans up the Agent
 func (a *Agent) Close() error {
+	return a.close(false)
+}
+
+// GracefulClose cleans up the Agent and waits for any goroutines it started
+// to complete. This is only safe to call outside of Agent callbacks or if in a callback,
+// in its own goroutine.
+func (a *Agent) GracefulClose() error {
+	return a.close(true)
+}
+
+func (a *Agent) close(graceful bool) error {
 	if err := a.ok(); err != nil {
+		if errors.Is(err, ErrClosed) {
+			return nil
+		}
 		return err
 	}
 
@@ -930,7 +945,14 @@ func (a *Agent) Close() error {
 	a.removeUfragFromMux()
 
 	close(a.done)
+	// the loop is safe to wait on no matter what
 	<-a.taskLoopDone
+
+	// but we are in less control of the notifiers, so we will
+	// pass through `graceful`.
+	a.connectionStateNotifier.Close(graceful)
+	a.candidateNotifier.Close(graceful)
+	a.selectedCandidatePairNotifier.Close(graceful)
 	return nil
 }
 
@@ -1033,16 +1055,16 @@ func (a *Agent) invalidatePendingBindingRequests(filterTime time.Time) {
 
 // Assert that the passed TransactionID is in our pendingBindingRequests and returns the destination
 // If the bindingRequest was valid remove it from our pending cache
-func (a *Agent) handleInboundBindingSuccess(id [stun.TransactionIDSize]byte) (bool, *bindingRequest) {
+func (a *Agent) handleInboundBindingSuccess(id [stun.TransactionIDSize]byte) (bool, *bindingRequest, time.Duration) {
 	a.invalidatePendingBindingRequests(time.Now())
 	for i := range a.pendingBindingRequests {
 		if a.pendingBindingRequests[i].transactionID == id {
 			validBindingRequest := a.pendingBindingRequests[i]
 			a.pendingBindingRequests = append(a.pendingBindingRequests[:i], a.pendingBindingRequests[i+1:]...)
-			return true, &validBindingRequest
+			return true, &validBindingRequest, time.Since(validBindingRequest.timestamp)
 		}
 	}
-	return false, nil
+	return false, nil, 0
 }
 
 // handleInbound processes STUN traffic from a remote candidate

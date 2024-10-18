@@ -30,7 +30,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"sync"
+	"runtime/cgo"
 	"unsafe"
 )
 
@@ -59,20 +59,6 @@ type closureContext struct {
 
 var (
 	errNilPtr = errors.New("cgo returned unexpected nil pointer")
-
-	closures = struct {
-		sync.RWMutex
-		m map[*C.GClosure]closureContext
-	}{
-		m: make(map[*C.GClosure]closureContext),
-	}
-
-	signals = struct {
-		sync.RWMutex
-		m map[SignalHandle]*C.GClosure
-	}{
-		m: make(map[SignalHandle]*C.GClosure),
-	}
 )
 
 /*
@@ -106,6 +92,8 @@ const (
 	TYPE_OBJECT    Type = C.G_TYPE_OBJECT
 	TYPE_VARIANT   Type = C.G_TYPE_VARIANT
 )
+
+var TYPE_SOCKET Type = Type(C.G_TYPE_SOCKET) // is function g_socket_get_type() inside macro, can't be const in Go
 
 // IsValue checks whether the passed in type can be used for g_value_init().
 func (t Type) IsValue() bool {
@@ -194,14 +182,18 @@ const (
 // not run.
 //
 //export goMarshal
-func goMarshal(closure *C.GClosure, retValue *C.GValue,
-	nParams C.guint, params *C.GValue,
-	invocationHint C.gpointer, marshalData *C.GValue) {
-
+func goMarshal(
+	closure *C.GClosure,
+	retValue *C.GValue,
+	nParams C.guint,
+	params *C.GValue,
+	invocationHint C.gpointer,
+	marshalData C.gpointer,
+) {
 	// Get the context associated with this callback closure.
-	closures.RLock()
-	cc := closures.m[closure]
-	closures.RUnlock()
+	ccHandle := cgo.Handle(*(*C.guint)(marshalData))
+
+	cc := ccHandle.Value().(*closureContext)
 
 	// Get number of parameters passed in.  If user data was saved with the
 	// closure context, increment the total number of parameters.
@@ -349,9 +341,6 @@ func sourceAttach(src *C.struct__GSource, rf reflect.Value, args ...interface{})
 	// always be a function.
 	var closure *C.GClosure
 	closure, _ = ClosureNew(rf.Interface(), args...)
-
-	// Remove closure context when closure is finalized.
-	C._g_closure_add_finalize_notifier(closure)
 
 	// Set closure to run as a callback when the idle source runs.
 	C.g_source_set_closure(src, closure)

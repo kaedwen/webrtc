@@ -258,50 +258,78 @@ func (v *Object) ListInterfaces() []string {
 }
 
 /*
- * GObject Signals
+* GObject Signals
  */
+var ErrSignalNotFound = errors.New("signal not found")
+var ErrSignalWrongNumberOfArgs = errors.New("wrong number of arguments")
 
 // Emit is a wrapper around g_signal_emitv() and emits the signal
 // specified by the string s to an Object.  Arguments to callback
 // functions connected to this signal must be specified in args.  Emit()
-// returns an interface{} which must be type asserted as the Go
-// equivalent type to the return value for native C callback.
+// returns an interface{} which contains the go equivalent of the C return value.
 //
-// Note that this code is unsafe in that the types of values in args are
-// not checked against whether they are suitable for the callback.
+// Make sure that the Types are known to go-glib. Special types need to be registered with
+// RegisterGValueMarshalers before calling Emit.
 func (v *Object) Emit(s string, args ...interface{}) (interface{}, error) {
 	cstr := C.CString(s)
 	defer C.free(unsafe.Pointer(cstr))
 
+	t := v.TypeFromInstance()
+	id := C.g_signal_lookup((*C.gchar)(cstr), C.GType(t))
+
+	if id == 0 {
+		return nil, ErrSignalNotFound
+	}
+
+	// query the signal info to determine the number of arguments and the return type
+	var q C.GSignalQuery
+	C.g_signal_query(id, &q)
+
+	if len(args) != int(q.n_params) {
+		return nil, fmt.Errorf("%w for signal %s: expected %d, got %d", ErrSignalWrongNumberOfArgs, s, q.n_params, len(args))
+	}
+
+	// get the return type, remove the static scope flag first
+	return_type := Type(q.return_type &^ C.G_SIGNAL_TYPE_STATIC_SCOPE)
+
 	// Create array of this instance and arguments
-	valv := C.alloc_gvalue_list(C.int(len(args)) + 1)
-	defer C.free(unsafe.Pointer(valv))
+	valv := C._alloc_gvalue_list(C.int(len(args)) + 1)
 
 	// Add args and valv
 	val, err := GValue(v)
 	if err != nil {
 		return nil, errors.New("error converting Object to GValue: " + err.Error())
 	}
-	C.val_list_insert(valv, C.int(0), val.native())
+	C._val_list_insert(valv, C.int(0), val.native())
+	defer runtime.KeepAlive(val) // keep the value alive until the signal has been emitted
+
 	for i := range args {
 		val, err := GValue(args[i])
 		if err != nil {
 			return nil, fmt.Errorf("error converting arg %d to GValue: %s", i, err.Error())
 		}
-		C.val_list_insert(valv, C.int(i+1), val.native())
+		C._val_list_insert(valv, C.int(i+1), val.native())
+		defer runtime.KeepAlive(val) // keep the value alive until the signal has been emitted
 	}
 
-	t := v.TypeFromInstance()
-	// TODO: use just the signal name
-	id := C.g_signal_lookup((*C.gchar)(cstr), C.GType(t))
+	// free the valv array after the values have been freed
+	defer C.g_free(C.gpointer(valv))
 
-	ret, err := ValueAlloc()
-	if err != nil {
-		return nil, errors.New("error creating Value for return value")
+	if return_type != TYPE_INVALID && return_type != TYPE_NONE {
+		// the return value must have the correct type set
+		ret, err := ValueInit(return_type)
+		if err != nil {
+			return nil, errors.New("error creating Value for return value")
+		}
+		C.g_signal_emitv(valv, id, C.GQuark(0), ret.native())
+
+		return ret.GoValue()
 	}
-	C.g_signal_emitv(valv, id, C.GQuark(0), ret.native())
 
-	return ret.GoValue()
+	// signal has no return value
+	C.g_signal_emitv(valv, id, C.GQuark(0), nil)
+
+	return nil, nil
 }
 
 // HandlerBlock is a wrapper around g_signal_handler_block().
@@ -317,16 +345,6 @@ func (v *Object) HandlerUnblock(handle SignalHandle) {
 // HandlerDisconnect is a wrapper around g_signal_handler_disconnect().
 func (v *Object) HandlerDisconnect(handle SignalHandle) {
 	C.g_signal_handler_disconnect(C.gpointer(v.GObject), C.gulong(handle))
-
-	signals.Lock()
-	closure := signals.m[handle]
-	C.g_closure_invalidate(closure)
-	delete(signals.m, handle)
-	signals.Unlock()
-
-	closures.Lock()
-	delete(closures.m, closure)
-	closures.Unlock()
 }
 
 // WithTransferOriginal can be used to capture an object from transfer-none
@@ -349,9 +367,8 @@ func (v *Object) WithTransferOriginal(f func()) {
 }
 
 // Keep will call runtime.KeepAlive on this or the extending object. It is useful for blocking
-// a pending finalizer on this instance from firing and leaving you with a dangling pointer. Place
-// this call where you are sure to be done with the object. This is a "go-like" equivalent to calling
-// Ref(), defer Unref() in the object's new scope.
+// a pending finalizer on this instance from firing and freeing the underlying C object.
+// This is needed in the bindings where the Object goes out of scope but the C pointer is still needed.
 func (v *Object) Keep() { runtime.KeepAlive(v) }
 
 // GetPrivate returns a pointer to the private data stored inside this object.

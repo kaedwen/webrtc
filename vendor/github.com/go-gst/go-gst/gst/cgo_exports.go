@@ -19,7 +19,6 @@ import (
 //export goElementCallAsync
 func goElementCallAsync(element *C.GstElement, userData C.gpointer) {
 	iface := gopointer.Restore(unsafe.Pointer(userData))
-	defer gopointer.Unref(unsafe.Pointer(userData))
 	f := iface.(func())
 	f()
 }
@@ -102,7 +101,6 @@ func goBusSyncHandler(bus *C.GstBus, cMsg *C.GstMessage, userData C.gpointer) C.
 	busFunc, ok := funcIface.(BusSyncHandler)
 
 	if !ok {
-		gopointer.Unref(ptr)
 		return C.GstBusSyncReply(BusPass)
 	}
 
@@ -119,13 +117,11 @@ func goBusFunc(bus *C.GstBus, cMsg *C.GstMessage, userData C.gpointer) C.gboolea
 	funcIface := gopointer.Restore(ptr)
 	busFunc, ok := funcIface.(BusWatchFunc)
 	if !ok {
-		gopointer.Unref(ptr)
 		return gboolean(false)
 	}
 
 	// run the call back
 	if cont := busFunc(msg); !cont {
-		gopointer.Unref(ptr)
 		return gboolean(false)
 	}
 
@@ -203,7 +199,6 @@ func goCapsMapFunc(features *C.GstCapsFeatures, structure *C.GstStructure, userD
 	mapFunc, ok := funcIface.(CapsMapFunc)
 
 	if !ok {
-		gopointer.Unref(ptr)
 		return gboolean(false)
 	}
 
@@ -218,7 +213,6 @@ func goClockCb(gclock *C.GstClock, clockTime C.GstClockTime, clockID C.GstClockI
 	cb, ok := funcIface.(ClockCallback)
 
 	if !ok {
-		gopointer.Unref(ptr)
 		return gboolean(false)
 	}
 
@@ -254,22 +248,39 @@ func goLogFunction(
 	message *C.GstDebugMessage,
 	userData C.gpointer,
 ) {
+	if category == nil {
+		return
+	}
+
 	logFnMu.RLock()
 	f := customLogFunction
 	logFnMu.RUnlock()
 
 	if f != nil {
-		var obj *glib.Object
-		if object != nil {
-			obj = glib.TransferNone(unsafe.Pointer(object))
-		}
 		f(
+			&DebugCategory{ptr: category},
 			DebugLevel(level),
 			C.GoString(file),
 			C.GoString(function),
 			int(line),
-			obj,
-			C.GoString(C.gst_debug_message_get(message)),
+			&LoggedObject{ptr: object},
+			&DebugMessage{ptr: message},
 		)
 	}
+}
+
+// goUnrefGopointerUserData is a GDestroyNotify used to unref the gopointer from the userdata, used for callback functions
+//
+//export goUnrefGopointerUserData
+func goUnrefGopointerUserData(fPtr C.gpointer) {
+	gopointer.Unref(unsafe.Pointer(fPtr))
+}
+
+// goPromiseChangeFunc is the function the GstPromise calls when it changes state
+//
+//export goPromiseChangeFunc
+func goPromiseChangeFunc(_ *C.GstPromise, fPtr C.gpointer) {
+	f := gopointer.Restore(unsafe.Pointer(fPtr)).(func())
+
+	f()
 }

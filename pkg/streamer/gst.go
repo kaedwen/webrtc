@@ -12,10 +12,15 @@ func init() {
 
 type Element struct {
 	*gst.Element
-	filter *gst.Caps
+	preFilter  *gst.Caps
+	postFilter *gst.Caps
 }
 
 type ElementList []Element
+
+func NewElement(element *gst.Element, pre *gst.Caps, post *gst.Caps) Element {
+	return Element{element, pre, post}
+}
 
 func (elems ElementList) Link() error {
 	for idx, elem := range elems {
@@ -24,8 +29,12 @@ func (elems ElementList) Link() error {
 			continue
 		}
 		pe := elems[idx-1]
-		if elem.filter != nil {
-			if err := pe.LinkFiltered(elem.Element, pe.filter); err != nil {
+		if pe.postFilter != nil {
+			if err := pe.LinkFiltered(elem.Element, pe.postFilter); err != nil {
+				return err
+			}
+		} else if elem.preFilter != nil {
+			if err := pe.LinkFiltered(elem.Element, elem.preFilter); err != nil {
 				return err
 			}
 		} else {
@@ -33,8 +42,8 @@ func (elems ElementList) Link() error {
 				return err
 			}
 		}
-
 	}
+
 	return nil
 }
 
