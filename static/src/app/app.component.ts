@@ -19,8 +19,8 @@ export class AppComponent implements OnInit {
 
   private readonly pc: RTCPeerConnection;
 
-  @HostListener('document:click', ['$event.target'])
-  async onClick(_: KeyboardEvent) {
+  @HostListener('document:click')
+  async onClick() {
     if (!this.selfAudioRunning) {
       await this.startAudio()
     }
