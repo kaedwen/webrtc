@@ -17,7 +17,7 @@ on:
 jobs:
   build-static:
     runs-on: ubuntu-latest
-    container: "debian:stable-slim"
+    container: "node:lts-slim"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,7 +36,7 @@ jobs:
   build:
     needs: build-static
     runs-on: ubuntu-latest
-    container: "debian:stable-slim"
+    container: "node:lts-slim"
     strategy:
       matrix:
         target:
