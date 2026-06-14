@@ -20,11 +20,6 @@ jobs:
     container: "node:lts-slim"
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache-dependency-path: static
-          cache: npm
       - run: |
           apt-get update
           apt-get install --yes --no-install-recommends make
