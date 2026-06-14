@@ -7,7 +7,8 @@ import { IsAnswer, IsIceCandidate, IsOffer } from './model';
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss']
+  styleUrls: ['./app.component.scss'],
+  standalone: true
 })
 export class AppComponent implements OnInit {
   @ViewChild("vc", { static: true, read: ViewContainerRef })

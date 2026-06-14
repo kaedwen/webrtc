@@ -180,7 +180,7 @@ func (wh *WebrtcHandler) handleVideoSamples(ctx context.Context, cfg *common.Con
 
 	var err error
 	var videoCh <-chan media.Sample
-	wh.videoPipeline, videoCh, err = streamer.CreateVideoPipelineSinkWithLaunch(wh.lg, src)
+	wh.videoPipeline, videoCh, err = streamer.CreateVideoPipelineSink(wh.lg, src)
 	if err != nil {
 		return err
 	}
