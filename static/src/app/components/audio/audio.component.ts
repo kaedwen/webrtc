@@ -1,9 +1,10 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 
 @Component({
-  selector: 'app-audio',
-  template: '<audio #audio></audio>',
-  styleUrls: ['./audio.component.scss']
+    selector: 'app-audio',
+    template: '<audio #audio></audio>',
+    styleUrls: ['./audio.component.scss'],
+    standalone: false
 })
 export class AudioComponent implements OnInit {
   @ViewChild('audio', { static: true, read: ElementRef })

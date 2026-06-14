@@ -1,9 +1,10 @@
 import { Component, ElementRef, ViewChild } from '@angular/core';
 
 @Component({
-  selector: 'app-video',
-  template: '<video #video></video>',
-  styleUrls: ['./video.component.scss']
+    selector: 'app-video',
+    template: '<video #video></video>',
+    styleUrls: ['./video.component.scss'],
+    standalone: false
 })
 export class VideoComponent {
   @ViewChild('video', { static: true, read: ElementRef })
