@@ -1,4 +1,4 @@
-import { Component, ComponentRef, HostListener, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
+import { Component, ComponentRef, HostListener, OnInit, ViewChild, ViewContainerRef, ChangeDetectionStrategy } from '@angular/core';
 import { VideoComponent } from './components/video/video.component';
 import { AudioComponent } from './components/audio/audio.component';
 import { SignalingService } from './services/signaling.service';
@@ -8,6 +8,7 @@ import { IsAnswer, IsIceCandidate, IsOffer } from './model';
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true
 })
 export class AppComponent implements OnInit {
