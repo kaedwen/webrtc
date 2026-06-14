@@ -24,7 +24,7 @@ jobs:
           apt-get update
           apt-get install --yes --no-install-recommends make
       - run: make build-static
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         with:
           name: static
           path: static/dist
@@ -70,7 +70,7 @@ jobs:
           echo "PKG_CONFIG_PATH=/usr/lib/${{ matrix.target.prefix }}/pkgconfig" >> $GITHUB_ENV
           echo "CC=${PREFIX:+$PREFIX-}gcc" >> $GITHUB_ENV
       - run: make build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         with:
           name: service-${{ matrix.target.os }}-${{ matrix.target.goarch }}
           path: service
